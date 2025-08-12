@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/status_screen.dart';
 import 'widgets/custom_bottom_nav.dart';
+import 'providers/order_provider.dart';
 
 void main() {
   runApp(const InventoryApp());
@@ -14,13 +16,16 @@ class InventoryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Inventory Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return ChangeNotifierProvider(
+      create: (context) => OrderProvider()..loadOrders(), // Initialize and load data
+      child: MaterialApp(
+        title: 'Inventory Tracker',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        home: const MainPage(),
       ),
-      home: const MainPage(),
     );
   }
 }

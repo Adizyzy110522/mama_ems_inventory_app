@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../models/order.dart';
+import '../providers/order_provider.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
-  final Map<String, dynamic> order;
+  final Order order;
 
   const OrderDetailsScreen({super.key, required this.order});
 
@@ -15,24 +19,37 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    packsOrdered = widget.order["packsOrdered"];
+    packsOrdered = widget.order.packsOrdered;
   }
 
-  void _increment() {
+  void _updateQuantity(OrderProvider provider) async {
+    if (packsOrdered != widget.order.packsOrdered) {
+      await provider.updateOrderQuantity(widget.order.id, packsOrdered);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quantity updated successfully')),
+        );
+      }
+    }
+  }
+
+  void _increment(OrderProvider provider) {
     setState(() {
       packsOrdered++;
     });
+    _updateQuantity(provider);
   }
 
-  void _decrement() {
+  void _decrement(OrderProvider provider) {
     if (packsOrdered > 0) {
       setState(() {
         packsOrdered--;
       });
+      _updateQuantity(provider);
     }
   }
 
-  void _manualInput() async {
+  void _manualInput(OrderProvider provider) async {
     final controller = TextEditingController(text: packsOrdered.toString());
 
     final result = await showDialog<int>(
@@ -69,6 +86,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       setState(() {
         packsOrdered = result;
       });
+      _updateQuantity(provider);
     }
   }
 
@@ -102,87 +120,106 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
+    return Consumer<OrderProvider>(
+      builder: (context, provider, child) {
+        // Get the most up-to-date order data
+        final currentOrder = provider.orders
+            .firstWhere((o) => o.id == widget.order.id, orElse: () => widget.order);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(order["storeName"]),
-        backgroundColor: Colors.blue,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 30),
-
-            // Packs Ordered Monitor
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(currentOrder.storeName),
+            backgroundColor: Colors.blue,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               children: [
-                // Minus Button
-                IconButton(
-                  icon: const Icon(Icons.remove_circle, size: 40, color: Colors.red),
-                  onPressed: _decrement,
+                const SizedBox(height: 30),
+
+                // Packs Ordered Monitor
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Minus Button
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle, size: 40, color: Colors.red),
+                      onPressed: () => _decrement(provider),
+                    ),
+
+                    // Big Circle Display (Tap to Edit)
+                    GestureDetector(
+                      onTap: () => _manualInput(provider),
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.blue.shade50,
+                          border: Border.all(color: Colors.blue, width: 4),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "$packsOrdered",
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                              const Text(
+                                "packs",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Plus Button
+                    IconButton(
+                      icon: const Icon(Icons.add_circle, size: 40, color: Colors.green),
+                      onPressed: () => _increment(provider),
+                    ),
+                  ],
                 ),
 
-                // Big Circle Display (Tap to Edit)
-                GestureDetector(
-                  onTap: _manualInput,
-                  child: Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.blue.shade50,
-                      border: Border.all(color: Colors.blue, width: 4),
+                const SizedBox(height: 30),
+
+                // Order Details
+                Expanded(
+                  child: Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Center(
-                      child: Text(
-                        "$packsOrdered",
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ListView(
+                        children: [
+                          _detailItem("Store Name", currentOrder.storeName),
+                          _detailItem("Person in Charge", currentOrder.personInCharge),
+                          _detailItem("Order Date", DateFormat('MMM dd, yyyy').format(currentOrder.orderDate)),
+                          _detailItem("Status", currentOrder.status),
+                          _detailItem("Payment Status", currentOrder.paymentStatus),
+                          _detailItem("Notes", currentOrder.notes),
+                        ],
                       ),
                     ),
                   ),
                 ),
-
-                // Plus Button
-                IconButton(
-                  icon: const Icon(Icons.add_circle, size: 40, color: Colors.green),
-                  onPressed: _increment,
-                ),
               ],
             ),
-
-            const SizedBox(height: 30),
-
-            // Order Details
-            Expanded(
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ListView(
-                    children: [
-                      _detailItem("Store Name", order["storeName"]),
-                      _detailItem("Person in Charge", order["personInCharge"]),
-                      _detailItem("Status", order["status"]),
-                      _detailItem("Payment Status", order["paymentStatus"]),
-                      _detailItem("Notes", order["notes"]),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
