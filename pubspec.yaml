@@ -27,6 +27,9 @@ dependencies:
   
   # Persistence for settings
   shared_preferences: ^2.2.2
+  
+  # Charts and graphs
+  fl_chart: ^0.66.1
 
 dev_dependencies:
   flutter_test:
