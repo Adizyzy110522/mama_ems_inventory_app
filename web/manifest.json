@@ -1,6 +1,6 @@
 {
-    "name": "mama_ems_inventory_app",
-    "short_name": "mama_ems_inventory_app",
+    "name": "Order Monitoring and Tracker App",
+    "short_name": "OMATA",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
