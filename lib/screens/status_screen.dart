@@ -10,10 +10,10 @@ class StatusScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.check_circle_outline, size: 24),
+            Icon(Icons.bar_chart, size: 24),
             SizedBox(width: 8),
             Text(
-              'Status',
+              'Statistics',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -24,13 +24,13 @@ class StatusScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.check_circle_outline,
+              Icons.bar_chart,
               size: 64,
               color: AppTheme.textSecondaryColor,
             ),
             const SizedBox(height: AppTheme.mediumSpacing),
             const Text(
-              'Status Screen',
+              'Statistics',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,

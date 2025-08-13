@@ -37,8 +37,8 @@ class CustomBottomNav extends StatelessWidget {
           label: 'Schedule',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.check_circle_outline),
-          label: 'Status',
+          icon: Icon(Icons.bar_chart),
+          label: 'Statistics',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.settings),

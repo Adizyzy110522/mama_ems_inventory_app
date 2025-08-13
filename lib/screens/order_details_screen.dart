@@ -394,21 +394,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 const SizedBox(height: AppTheme.largeSpacing),
 
                 // Packs Ordered Monitor with Interactive Progress Circle
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
-                  children: [
-                    const SizedBox(width: 8), // Added for spacing
-                    // Minus Button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.remove_circle, 
-                        size: 70, // Increased from 50 to 70
-                        color: AppTheme.cancelledColor
-                      ),
-                      padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
-                      onPressed: () => _decrement(provider),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
+                      children: [
+                        // Minus Button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle, 
+                            size: 70, // Increased from 50 to 70
+                            color: AppTheme.cancelledColor
+                          ),
+                          padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
+                          onPressed: () => _decrement(provider),
+                        ),
 
                     // Interactive Progress Circle
                     GestureDetector(
@@ -508,7 +511,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
                       onPressed: () => _increment(provider),
                     ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: AppTheme.largeSpacing),
