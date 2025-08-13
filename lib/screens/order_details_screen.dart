@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/order_provider.dart';
+import '../config/app_theme.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -22,22 +23,59 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     packsOrdered = widget.order.packsOrdered;
   }
 
-  void _updateQuantity(OrderProvider provider) async {
+  Future<void> _updateQuantity(OrderProvider provider) async {
     if (packsOrdered != widget.order.packsOrdered) {
-      await provider.updateOrderQuantity(widget.order.id, packsOrdered);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quantity updated successfully')),
-        );
+      try {
+        // Validate input before updating
+        if (packsOrdered < 0) {
+          throw Exception('Quantity cannot be negative');
+        }
+        
+        if (packsOrdered > Order.maxPacksPerOrder) {
+          throw Exception('Maximum order quantity exceeded (${Order.maxPacksPerOrder})');
+        }
+        
+        await provider.updateOrderQuantity(widget.order.id, packsOrdered);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quantity updated successfully')),
+          );
+        }
+      } catch (e) {
+        // Handle errors
+        if (mounted) {
+          setState(() {
+            // Revert to original value on error
+            packsOrdered = widget.order.packsOrdered;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating quantity: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
 
   void _increment(OrderProvider provider) {
-    setState(() {
-      packsOrdered++;
-    });
-    _updateQuantity(provider);
+    // Prevent exceeding max value
+    if (packsOrdered < Order.maxPacksPerOrder) {
+      setState(() {
+        packsOrdered++;
+      });
+      _updateQuantity(provider);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum order quantity (${Order.maxPacksPerOrder}) reached'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   void _decrement(OrderProvider provider) {
@@ -46,39 +84,82 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         packsOrdered--;
       });
       _updateQuantity(provider);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quantity cannot be negative'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
   void _manualInput(OrderProvider provider) async {
     final controller = TextEditingController(text: packsOrdered.toString());
+    String? errorText;
 
     final result = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Enter Packs Ordered"),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: "Enter number of packs",
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text("Enter Packs Ordered"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: "Enter number of packs",
+                  errorText: errorText,
+                  helperText: "Maximum: ${Order.maxPacksPerOrder} packs",
+                ),
+                onChanged: (value) {
+                  // Live validation
+                  setState(() {
+                    final parsedValue = int.tryParse(value);
+                    if (parsedValue == null) {
+                      errorText = "Please enter a valid number";
+                    } else if (parsedValue < 0) {
+                      errorText = "Quantity cannot be negative";
+                    } else if (parsedValue > Order.maxPacksPerOrder) {
+                      errorText = "Maximum quantity exceeded";
+                    } else {
+                      errorText = null;
+                    }
+                  });
+                },
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Cancel
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final value = int.tryParse(controller.text);
+                if (value != null && value >= 0 && value <= Order.maxPacksPerOrder) {
+                  Navigator.pop(context, value);
+                } else {
+                  // Show error in the dialog
+                  setState(() {
+                    if (value == null) {
+                      errorText = "Please enter a valid number";
+                    } else if (value < 0) {
+                      errorText = "Quantity cannot be negative";
+                    } else {
+                      errorText = "Maximum quantity (${Order.maxPacksPerOrder}) exceeded";
+                    }
+                  });
+                }
+              },
+              child: const Text("OK"),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Cancel
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final value = int.tryParse(controller.text);
-              if (value != null && value >= 0) {
-                Navigator.pop(context, value);
-              }
-            },
-            child: const Text("OK"),
-          ),
-        ],
       ),
     );
 
@@ -92,15 +173,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _detailItem(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.smallSpacing),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade600,
+              color: AppTheme.textSecondaryColor,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -128,14 +209,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(currentOrder.storeName),
-            backgroundColor: Colors.blue,
+            title: Row(
+              children: [
+                const Icon(Icons.inventory_2, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  currentOrder.storeName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
           ),
           body: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(AppTheme.mediumSpacing),
             child: Column(
               children: [
-                const SizedBox(height: 30),
+                const SizedBox(height: AppTheme.largeSpacing),
 
                 // Packs Ordered Monitor
                 Row(
@@ -143,7 +232,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   children: [
                     // Minus Button
                     IconButton(
-                      icon: const Icon(Icons.remove_circle, size: 40, color: Colors.red),
+                      icon: const Icon(
+                        Icons.remove_circle, 
+                        size: 40, 
+                        color: AppTheme.cancelledColor
+                      ),
                       onPressed: () => _decrement(provider),
                     ),
 
@@ -155,8 +248,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         height: 150,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.blue.shade50,
-                          border: Border.all(color: Colors.blue, width: 4),
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          border: Border.all(color: AppTheme.primaryColor, width: 4),
                         ),
                         child: Center(
                           child: Column(
@@ -167,14 +260,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 style: const TextStyle(
                                   fontSize: 40,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
+                                  color: AppTheme.primaryColor,
                                 ),
                               ),
                               const Text(
                                 "packs",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.blue,
+                                  color: AppTheme.primaryColor,
                                 ),
                               ),
                             ],
@@ -185,23 +278,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
                     // Plus Button
                     IconButton(
-                      icon: const Icon(Icons.add_circle, size: 40, color: Colors.green),
+                      icon: const Icon(
+                        Icons.add_circle, 
+                        size: 40, 
+                        color: AppTheme.completedColor
+                      ),
                       onPressed: () => _increment(provider),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: AppTheme.largeSpacing),
 
                 // Order Details
                 Expanded(
                   child: Card(
-                    elevation: 2,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(AppTheme.mediumSpacing),
                       child: ListView(
                         children: [
                           _detailItem("Store Name", currentOrder.storeName),

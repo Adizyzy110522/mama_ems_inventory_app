@@ -31,8 +31,37 @@
 
   <title>mama_ems_inventory_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Include SQLite wasm files -->
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sqflite_common_ffi_web@0.4.0/assets/sqflite_sw.js"></script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    var serviceWorkerVersion = null;
+    // This prevents the Flutter web app from being unresponsive for the first load.
+    window.addEventListener('load', function() {
+      var loadingIndicator = document.createElement('div');
+      loadingIndicator.innerHTML = 'Loading...';
+      loadingIndicator.style.position = 'fixed';
+      loadingIndicator.style.top = '50%';
+      loadingIndicator.style.left = '50%';
+      loadingIndicator.style.transform = 'translate(-50%, -50%)';
+      document.body.appendChild(loadingIndicator);
+
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        }
+      }).then(function(engineInitializer) {
+        return engineInitializer.initializeEngine();
+      }).then(function(appRunner) {
+        loadingIndicator.remove();
+        return appRunner.runApp();
+      });
+    });
+  </script>
 </body>
 </html>

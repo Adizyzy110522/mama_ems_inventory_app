@@ -53,14 +53,14 @@ class OrdersScreen extends StatelessWidget {
                   Icon(
                     Icons.list_alt,
                     size: 64,
-                    color: Colors.grey,
+                    color: AppTheme.textLightColor,
                   ),
                   SizedBox(height: 16),
                   Text(
                     'No orders found',
                     style: TextStyle(
                       fontSize: 18,
-                      color: Colors.grey,
+                      color: AppTheme.textSecondaryColor,
                     ),
                   ),
                 ],
@@ -70,10 +70,10 @@ class OrdersScreen extends StatelessWidget {
 
           return RefreshIndicator(
             onRefresh: () async {
-              await provider.loadOrders();
+              await provider.loadOrders(refresh: true);
             },
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppTheme.mediumSpacing),
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];
@@ -263,7 +263,7 @@ class OrdersScreen extends StatelessWidget {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppTheme.smallSpacing),
                     TextField(
                       controller: personController,
                       decoration: const InputDecoration(
@@ -271,54 +271,51 @@ class OrdersScreen extends StatelessWidget {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppTheme.smallSpacing),
                     TextField(
                       controller: packsController,
-                      keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: 'Packs Ordered',
+                        labelText: 'Number of Packs',
                         border: OutlineInputBorder(),
                       ),
+                      keyboardType: TextInputType.number,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppTheme.smallSpacing),
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Status',
                         border: OutlineInputBorder(),
                       ),
                       value: status,
-                      onChanged: (newValue) {
+                      items: const [
+                        DropdownMenuItem(value: 'Processing', child: Text('Processing')),
+                        DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                        DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          status = newValue!;
+                          status = value!;
                         });
                       },
-                      items: Order.validStatuses.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppTheme.smallSpacing),
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Payment Status',
                         border: OutlineInputBorder(),
                       ),
                       value: paymentStatus,
-                      onChanged: (newValue) {
+                      items: const [
+                        DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+                        DropdownMenuItem(value: 'Paid', child: Text('Paid')),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          paymentStatus = newValue!;
+                          paymentStatus = value!;
                         });
                       },
-                      items: Order.validPaymentStatuses.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppTheme.smallSpacing),
                     TextField(
                       controller: notesController,
                       decoration: const InputDecoration(
@@ -332,73 +329,41 @@ class OrdersScreen extends StatelessWidget {
               ),
               actions: <Widget>[
                 TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
                   child: const Text('Cancel'),
-                  onPressed: () => Navigator.of(context).pop(),
                 ),
                 ElevatedButton(
-                  child: const Text('Add Order'),
                   onPressed: () {
-                    if (storeNameController.text.isEmpty ||
-                        personController.text.isEmpty ||
-                        packsController.text.isEmpty) {
+                    final storeName = storeNameController.text.trim();
+                    final person = personController.text.trim();
+                    final packsText = packsController.text.trim();
+                    
+                    if (storeName.isEmpty || person.isEmpty || packsText.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please fill all required fields'),
-                          backgroundColor: Colors.red,
-                        ),
+                        const SnackBar(content: Text('Please fill all required fields')),
                       );
                       return;
                     }
-
-                    // Parse the number of packs
-                    int packs;
-                    try {
-                      packs = int.parse(packsController.text);
-                      if (packs < 0 || packs > Order.maxPacksPerOrder) {
-                        throw FormatException('Invalid quantity');
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Invalid quantity. Please enter a number between 0 and ${Order.maxPacksPerOrder}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Create and add the new order
-                    final order = Order(
-                      id: const Uuid().v4(), // Generate a unique ID
-                      storeName: storeNameController.text,
-                      personInCharge: personController.text,
+                    
+                    final packs = int.tryParse(packsText) ?? 1;
+                    
+                    final newOrder = Order(
+                      id: const Uuid().v4(),
+                      storeName: storeName,
+                      personInCharge: person,
                       packsOrdered: packs,
                       status: status,
                       paymentStatus: paymentStatus,
-                      notes: notesController.text,
                       orderDate: DateTime.now(),
-                      deliveryDate: null,
+                      notes: notesController.text,
                     );
-
-                    Provider.of<OrderProvider>(context, listen: false)
-                        .addOrder(order)
-                        .then((_) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Order added successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }).catchError((error) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error adding order: $error'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    });
+                    
+                    Provider.of<OrderProvider>(context, listen: false).addOrder(newOrder);
+                    Navigator.pop(context);
                   },
+                  child: const Text('Save'),
                 ),
               ],
             );

@@ -15,20 +15,52 @@ class OrderProvider with ChangeNotifier {
   };
   
   bool _isLoading = false;
+  String? _lastError;
+  
+  // Pagination support
+  static const int _pageSize = 20;
+  int _currentPage = 0;
+  bool _hasMoreOrders = true;
 
   List<Order> get orders => _orders;
   Map<String, int> get statistics => _statistics;
   bool get isLoading => _isLoading;
+  String? get lastError => _lastError;
+  bool get hasMoreOrders => _hasMoreOrders;
 
-  Future<void> loadOrders() async {
+  Future<void> loadOrders({bool refresh = false}) async {
+    if (refresh) {
+      _orders = [];
+      _currentPage = 0;
+      _hasMoreOrders = true;
+    }
+    
+    if (_isLoading || (!_hasMoreOrders && !refresh)) return;
+    
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
     
     try {
-      _orders = await _databaseHelper.getAllOrders();
-      await loadStatistics();
+      // For now, we'll load all orders until we implement pagination in the database helper
+      if (_orders.isEmpty || refresh) {
+        _orders = await _databaseHelper.getAllOrders();
+        await loadStatistics();
+      }
+      
+      // Placeholder for future pagination implementation
+      // final newOrders = await _databaseHelper.getOrdersPaginated(_currentPage, _pageSize);
+      // _hasMoreOrders = newOrders.length == _pageSize;
+      // if (refresh) {
+      //   _orders = newOrders;
+      // } else {
+      //   _orders.addAll(newOrders);
+      // }
+      // _currentPage++;
+      
     } catch (e) {
-      print('Error loading orders: $e');
+      _lastError = 'Error loading orders: $e';
+      debugPrint(_lastError);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -40,7 +72,16 @@ class OrderProvider with ChangeNotifier {
       _statistics = await _databaseHelper.getOrderStatistics();
       notifyListeners();
     } catch (e) {
-      print('Error loading statistics: $e');
+      _lastError = 'Error loading statistics: $e';
+      debugPrint(_lastError);
+    }
+  }
+  
+  /// Reload data when error occurred
+  Future<void> retryLastOperation() async {
+    if (_lastError != null) {
+      _lastError = null;
+      await loadOrders(refresh: true);
     }
   }
 

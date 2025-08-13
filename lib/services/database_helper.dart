@@ -1,4 +1,6 @@
 // lib/services/database_helper.dart
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/order.dart';
@@ -9,23 +11,65 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   Database? _database;
+  final Completer<void> _initializationCompleter = Completer<void>();
+  bool _isInitializing = false;
 
+  /// Returns the database instance, initializing it if necessary.
+  /// Uses a Completer to prevent multiple simultaneous initializations.
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
+    
+    // Wait if initialization is already in progress
+    if (_isInitializing) {
+      await _initializationCompleter.future;
+      return _database!;
+    }
+    
+    try {
+      _isInitializing = true;
+      _database = await _initDatabase();
+      if (!_initializationCompleter.isCompleted) {
+        _initializationCompleter.complete();
+      }
+    } catch (e) {
+      if (!_initializationCompleter.isCompleted) {
+        _initializationCompleter.completeError(e);
+      }
+      rethrow;
+    } finally {
+      _isInitializing = false;
+    }
+    
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'orders.db');
-    
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _onCreate,
-    );
+    try {
+      String path;
+      
+      if (kIsWeb) {
+        // For web, use a simple name as path is virtual anyway
+        path = 'orders_database.db';
+        debugPrint('Using web database path: $path');
+      } else {
+        // For native platforms, use the file system
+        path = join(await getDatabasesPath(), 'orders.db');
+        debugPrint('Using native database path: $path');
+      }
+      
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e) {
+      debugPrint('Database initialization error: $e');
+      rethrow;
+    }
   }
 
+  /// Handles database creation when the database is first created
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE orders (
@@ -41,8 +85,21 @@ class DatabaseHelper {
       )
     ''');
 
-    // Insert sample data
-    await _insertSampleData(db);
+    // Insert sample data only in debug mode
+    if (kDebugMode) {
+      await _insertSampleData(db);
+    }
+  }
+  
+  /// Handles database upgrades when version changes
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    debugPrint('Upgrading database from version $oldVersion to $newVersion');
+    
+    // Add migration logic here as the app evolves
+    // Example:
+    // if (oldVersion < 2) {
+    //   await db.execute('ALTER TABLE orders ADD COLUMN priority TEXT');
+    // }
   }
 
   Future<void> _insertSampleData(Database db) async {
@@ -100,95 +157,214 @@ class DatabaseHelper {
 
   // CRUD Operations
   Future<int> insertOrder(Order order) async {
-    final db = await database;
-    return await db.insert('orders', order.toMap());
+    try {
+      final db = await database;
+      return await db.insert('orders', order.toMap(), 
+        conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      debugPrint('Error inserting order: $e');
+      rethrow;
+    }
   }
 
   Future<List<Order>> getAllOrders() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('orders');
-    
-    return List.generate(maps.length, (i) {
-      return Order.fromMap(maps[i]);
-    });
+    try {
+      final maps = await safeQuery('orders');
+      
+      return List.generate(maps.length, (i) {
+        try {
+          return Order.fromMap(maps[i]);
+        } catch (e) {
+          debugPrint('Error parsing order at index $i: $e');
+          // Return a placeholder order to prevent app crash, but mark it as invalid
+          return Order(
+            id: 'error_${DateTime.now().millisecondsSinceEpoch}_$i',
+            storeName: 'Error Loading Order',
+            personInCharge: '',
+            packsOrdered: 0,
+            status: 'Error',
+            paymentStatus: 'Unknown',
+            notes: 'There was an error loading this order: $e',
+            orderDate: DateTime.now(),
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('Error getting all orders: $e');
+      return [];
+    }
   }
 
   Future<Order?> getOrder(String id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'orders',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    try {
+      final maps = await safeQuery(
+        'orders',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
 
-    if (maps.isNotEmpty) {
-      return Order.fromMap(maps.first);
+      if (maps.isNotEmpty) {
+        return Order.fromMap(maps.first);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting order $id: $e');
+      return null;
     }
-    return null;
   }
 
   Future<int> updateOrder(Order order) async {
-    final db = await database;
-    return await db.update(
-      'orders',
-      order.toMap(),
-      where: 'id = ?',
-      whereArgs: [order.id],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'orders',
+        order.toMap(),
+        where: 'id = ?',
+        whereArgs: [order.id],
+      );
+    } catch (e) {
+      debugPrint('Error updating order ${order.id}: $e');
+      rethrow;
+    }
   }
 
   Future<int> deleteOrder(String id) async {
-    final db = await database;
-    return await db.delete(
-      'orders',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    try {
+      final db = await database;
+      return await db.delete(
+        'orders',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      debugPrint('Error deleting order $id: $e');
+      rethrow;
+    }
   }
 
   Future<List<Order>> getOrdersByStatus(String status) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'orders',
-      where: 'status = ?',
-      whereArgs: [status],
-    );
+    try {
+      final maps = await safeQuery(
+        'orders',
+        where: 'status = ?',
+        whereArgs: [status],
+      );
 
-    return List.generate(maps.length, (i) {
-      return Order.fromMap(maps[i]);
-    });
+      return List.generate(maps.length, (i) {
+        try {
+          return Order.fromMap(maps[i]);
+        } catch (e) {
+          debugPrint('Error parsing order with status $status at index $i: $e');
+          return Order(
+            id: 'error_${DateTime.now().millisecondsSinceEpoch}_$i',
+            storeName: 'Error Loading Order',
+            personInCharge: '',
+            packsOrdered: 0,
+            status: status,
+            paymentStatus: 'Unknown',
+            notes: 'There was an error loading this order: $e',
+            orderDate: DateTime.now(),
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('Error getting orders by status $status: $e');
+      return [];
+    }
   }
 
   Future<Map<String, int>> getOrderStatistics() async {
-    final db = await database;
-    
-    final completed = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders WHERE status = ?',
-      ['Completed']
-    );
-    final cancelled = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders WHERE status = ?',
-      ['Cancelled']
-    );
-    final pending = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders WHERE status = ?',
-      ['Processing']
-    );
-    final paid = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders WHERE paymentStatus = ?',
-      ['Paid']
-    );
+    try {
+      final db = await database;
+      
+      // Use a single transaction to get all statistics for better performance and consistency
+      return await db.transaction((txn) async {
+        final completed = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE status = ?',
+          ['Completed']
+        );
+        final cancelled = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE status = ?',
+          ['Cancelled']
+        );
+        final pending = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE status = ?',
+          ['Processing']
+        );
+        final paid = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE paymentStatus = ?',
+          ['Paid']
+        );
 
-    return {
-      'completed': completed.first['count'] as int,
-      'cancelled': cancelled.first['count'] as int,
-      'pending': pending.first['count'] as int,
-      'paid': paid.first['count'] as int,
-    };
+        return {
+          'completed': completed.isNotEmpty ? (completed.first['count'] as int? ?? 0) : 0,
+          'cancelled': cancelled.isNotEmpty ? (cancelled.first['count'] as int? ?? 0) : 0,
+          'pending': pending.isNotEmpty ? (pending.first['count'] as int? ?? 0) : 0,
+          'paid': paid.isNotEmpty ? (paid.first['count'] as int? ?? 0) : 0,
+        };
+      });
+    } catch (e) {
+      debugPrint('Error getting order statistics: $e');
+      // Return default values if we can't get statistics
+      return {
+        'completed': 0,
+        'cancelled': 0,
+        'pending': 0,
+        'paid': 0,
+      };
+    }
   }
 
+  /// Close the database connection
   Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      debugPrint('Database connection closed');
+    }
+  }
+  
+  /// Execute a transaction with proper error handling
+  Future<T> executeTransaction<T>(Future<T> Function(Transaction txn) action) async {
     final db = await database;
-    await db.close();
+    try {
+      return await db.transaction(action);
+    } catch (e) {
+      debugPrint('Transaction error: $e');
+      rethrow;
+    }
+  }
+  
+  /// Safe database query with error handling
+  Future<List<Map<String, dynamic>>> safeQuery(
+    String table, {
+    bool? distinct,
+    List<String>? columns,
+    String? where,
+    List<Object?>? whereArgs,
+    String? groupBy,
+    String? having,
+    String? orderBy,
+    int? limit,
+    int? offset,
+  }) async {
+    try {
+      final db = await database;
+      return await db.query(
+        table,
+        distinct: distinct,
+        columns: columns,
+        where: where,
+        whereArgs: whereArgs,
+        groupBy: groupBy,
+        having: having,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
+    } catch (e) {
+      debugPrint('Query error: $e');
+      rethrow;
+    }
   }
 }
