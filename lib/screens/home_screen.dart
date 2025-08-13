@@ -3,26 +3,71 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../config/app_theme.dart';
 import '../providers/order_provider.dart';
+import '../providers/product_manager.dart';
 import '../models/order.dart';
 import 'order_details_screen.dart';
+import 'filtered_orders_screen.dart';
+import 'landing_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+  
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
+class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.dashboard, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'Dashboard',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
+        title: Consumer<ProductManager>(
+          builder: (context, productManager, _) {
+            // Get proper product title
+            String productTitle = '';
+            switch(productManager.currentProduct) {
+              case 'banana':
+                productTitle = 'Banana Chips';
+                break;
+              case 'karlang':
+                productTitle = 'Karlang Chips';
+                break;
+              case 'kamote':
+                productTitle = 'Kamote Chips';
+                break;
+              default:
+                productTitle = 'Products';
+            }
+            
+            return Row(
+              children: [
+                const Icon(Icons.dashboard, size: 24),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Dashboard',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      productTitle,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }
         ),
+        actions: [
+          // Add a button to go back to product selection
+          IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Navigator.pushReplacementNamed(context, '/landing'),
+            tooltip: 'Change Product Category',
+          ),
+        ],
       ),
       body: Consumer<OrderProvider>(
         builder: (context, provider, child) {
@@ -130,9 +175,42 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppTheme.mediumSpacing),
-            const Text(
-              'Welcome to Mama Em\'s Inventory Management',
-              style: TextStyle(fontSize: 15),
+            Consumer<ProductManager>(
+              builder: (context, productManager, _) {
+                String productTitle = '';
+                switch(productManager.currentProduct) {
+                  case 'banana':
+                    productTitle = 'Banana Chips Production';
+                    break;
+                  case 'karlang':
+                    productTitle = 'Karlang Chips Production';
+                    break;
+                  case 'kamote':
+                    productTitle = 'Kamote Chips Production';
+                    break;
+                  default:
+                    productTitle = 'Product Management';
+                }
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Welcome to Mama Em\'s Inventory Management',
+                      style: TextStyle(fontSize: 15),
+                    ),
+                    const SizedBox(height: AppTheme.smallSpacing),
+                    Text(
+                      productTitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                );
+              }
             ),
           ],
         ),
@@ -219,33 +297,46 @@ class HomeScreen extends StatelessWidget {
     required Color color,
   }) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.mediumSpacing),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color),
-                const SizedBox(width: AppTheme.smallSpacing),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondaryColor,
+      child: InkWell(
+        onTap: () {
+          // Navigate to Orders screen with filter
+          final status = title == 'Paid' ? 'payment:$title' : title;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FilteredOrdersScreen(filterStatus: status),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.mediumSpacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: color),
+                  const SizedBox(width: AppTheme.smallSpacing),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondaryColor,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.mediumSpacing),
-            Text(
-              value.toString(),
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: AppTheme.mediumSpacing),
+              Text(
+                value.toString(),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

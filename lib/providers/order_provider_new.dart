@@ -4,9 +4,7 @@ import '../models/order.dart';
 import '../services/database_helper.dart';
 
 class OrderProvider with ChangeNotifier {
-  // Using non-final so we can change it when switching product categories
-  late DatabaseHelper _databaseHelper;
-  String _productCategory = 'banana'; // Default category
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
   
   List<Order> _orders = [];
   Map<String, int> _statistics = {
@@ -18,48 +16,26 @@ class OrderProvider with ChangeNotifier {
   
   bool _isLoading = false;
   String? _lastError;
+  String? _activeFilter;
   
   // Pagination support
   static const int _pageSize = 20;
   int _currentPage = 0;
   bool _hasMoreOrders = true;
-  
-  // Constructor that allows setting the product category
-  OrderProvider({String? productCategory}) {
-    _productCategory = productCategory ?? 'banana';
-    _databaseHelper = DatabaseHelper(productCategory: _productCategory);
-  }
-  
-  // Method to change product category
-  void setProductCategory(String category) {
-    if (_productCategory != category) {
-      _productCategory = category;
-      // Get a new database helper for this category
-      _databaseHelper = DatabaseHelper(productCategory: category);
-      _orders = []; // Clear current orders
-      _statistics = {
-        'completed': 0,
-        'cancelled': 0,
-        'pending': 0,
-        'paid': 0,
-      }; // Reset statistics
-      loadOrders(refresh: true);
-    }
-  }
-  
-  String get productCategory => _productCategory;
 
   List<Order> get orders => _orders;
   Map<String, int> get statistics => _statistics;
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
   bool get hasMoreOrders => _hasMoreOrders;
+  String? get activeFilter => _activeFilter;
 
   Future<void> loadOrders({bool refresh = false}) async {
     if (refresh) {
       _orders = [];
       _currentPage = 0;
       _hasMoreOrders = true;
+      _activeFilter = null;
     }
     
     if (_isLoading || (!_hasMoreOrders && !refresh)) return;
@@ -107,6 +83,7 @@ class OrderProvider with ChangeNotifier {
   /// Load orders filtered by status
   Future<void> loadOrdersByStatus(String status) async {
     _isLoading = true;
+    _activeFilter = "Status: $status";
     _lastError = null;
     notifyListeners();
     
@@ -124,6 +101,7 @@ class OrderProvider with ChangeNotifier {
   /// Load orders filtered by payment status
   Future<void> loadOrdersByPaymentStatus(String paymentStatus) async {
     _isLoading = true;
+    _activeFilter = "Payment: $paymentStatus";
     _lastError = null;
     notifyListeners();
     
@@ -136,6 +114,12 @@ class OrderProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+  
+  /// Clear filters and reload all orders
+  Future<void> clearFilters() async {
+    _activeFilter = null;
+    await loadOrders(refresh: true);
   }
   
   /// Reload data when error occurred
@@ -160,12 +144,10 @@ class OrderProvider with ChangeNotifier {
   Future<void> updateOrder(Order order) async {
     try {
       await _databaseHelper.updateOrder(order);
-      
       final index = _orders.indexWhere((o) => o.id == order.id);
       if (index != -1) {
         _orders[index] = order;
       }
-      
       await loadStatistics();
       notifyListeners();
     } catch (e) {
@@ -173,90 +155,47 @@ class OrderProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteOrder(String orderId) async {
+  Future<void> deleteOrder(String id) async {
     try {
-      await _databaseHelper.deleteOrder(orderId);
-      _orders.removeWhere((order) => order.id == orderId);
+      await _databaseHelper.deleteOrder(id);
+      _orders.removeWhere((order) => order.id == id);
       await loadStatistics();
       notifyListeners();
     } catch (e) {
       print('Error deleting order: $e');
     }
   }
-
-  Future<void> updatePacksProduced(String orderId, int packsProduced) async {
-    try {
-      final orderIndex = _orders.indexWhere((order) => order.id == orderId);
-      if (orderIndex != -1) {
-        final currentOrder = _orders[orderIndex];
-        // Ensure packsProduced doesn't exceed packsOrdered
-        final validatedPacksProduced = packsProduced > currentOrder.packsOrdered
-            ? currentOrder.packsOrdered
-            : packsProduced;
-        
-        String updatedStatus = currentOrder.status;
-        
-        // Auto-mark as completed if packs produced equals packs ordered
-        if (validatedPacksProduced == currentOrder.packsOrdered && 
-            currentOrder.status != 'Completed' &&
-            currentOrder.status != 'Cancelled') {
-          updatedStatus = 'Completed';
-        }
-            
-        final updatedOrder = currentOrder.copyWith(
-          packsProduced: validatedPacksProduced,
-          status: updatedStatus,
-        );
-        await updateOrder(updatedOrder);
-      }
-    } catch (e) {
-      print('Error updating produced packs: $e');
-    }
-  }
   
-  // Keep this for backward compatibility - redirects to updatePacksProduced
-  @Deprecated('Use updatePacksProduced instead')
-  Future<void> updateOrderQuantity(String orderId, int newQuantity) async {
-    return updatePacksProduced(orderId, newQuantity);
-  }
-
-  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+  Future<void> updateOrderProgress(String orderId, int packsProduced) async {
     try {
-      final orderIndex = _orders.indexWhere((order) => order.id == orderId);
-      if (orderIndex != -1) {
-        final updatedOrder = _orders[orderIndex].copyWith(
-          status: newStatus,
-        );
-        await updateOrder(updatedOrder);
-      }
+      final index = _orders.indexWhere((order) => order.id == orderId);
+      if (index == -1) return;
+      
+      // Get the current order
+      final currentOrder = _orders[index];
+      
+      // Create a new order with updated packs produced
+      final updatedOrder = Order(
+        id: currentOrder.id,
+        storeName: currentOrder.storeName,
+        personInCharge: currentOrder.personInCharge,
+        contactNumber: currentOrder.contactNumber,
+        packsOrdered: currentOrder.packsOrdered,
+        packsProduced: packsProduced,
+        status: currentOrder.status,
+        paymentStatus: currentOrder.paymentStatus,
+        notes: currentOrder.notes,
+        orderDate: currentOrder.orderDate,
+        deliveryDate: currentOrder.deliveryDate,
+      );
+      
+      // Update in database and memory
+      await _databaseHelper.updateOrder(updatedOrder);
+      _orders[index] = updatedOrder;
+      
+      notifyListeners();
     } catch (e) {
-      print('Error updating order status: $e');
+      print('Error updating order progress: $e');
     }
-  }
-
-  Future<void> updatePaymentStatus(String orderId, String newPaymentStatus) async {
-    try {
-      final orderIndex = _orders.indexWhere((order) => order.id == orderId);
-      if (orderIndex != -1) {
-        final updatedOrder = _orders[orderIndex].copyWith(
-          paymentStatus: newPaymentStatus,
-        );
-        await updateOrder(updatedOrder);
-      }
-    } catch (e) {
-      print('Error updating payment status: $e');
-    }
-  }
-
-  List<Order> getOrdersByStatus(String status) {
-    return _orders.where((order) => order.status == status).toList();
-  }
-
-  List<Order> searchOrders(String query) {
-    final lowerQuery = query.toLowerCase();
-    return _orders.where((order) =>
-      order.storeName.toLowerCase().contains(lowerQuery) ||
-      order.personInCharge.toLowerCase().contains(lowerQuery)
-    ).toList();
   }
 }

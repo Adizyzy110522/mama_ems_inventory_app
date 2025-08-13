@@ -6,9 +6,22 @@ import 'package:path/path.dart';
 import '../models/order.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper _instance = DatabaseHelper._internal();
-  factory DatabaseHelper() => _instance;
-  DatabaseHelper._internal();
+  // Static cache of database helpers per product category
+  static final Map<String, DatabaseHelper> _instances = {};
+  
+  // Factory constructor that creates/returns instance for specific product category
+  factory DatabaseHelper({String productCategory = 'banana'}) {
+    if (!_instances.containsKey(productCategory)) {
+      _instances[productCategory] = DatabaseHelper._internal(productCategory);
+    }
+    return _instances[productCategory]!;
+  }
+  
+  // The product category this instance is for
+  final String productCategory;
+  
+  // Private constructor
+  DatabaseHelper._internal(this.productCategory);
 
   Database? _database;
   final Completer<void> _initializationCompleter = Completer<void>();
@@ -49,12 +62,12 @@ class DatabaseHelper {
       
       if (kIsWeb) {
         // For web, use a simple name as path is virtual anyway
-        path = 'orders_database.db';
-        debugPrint('Using web database path: $path');
+        path = 'orders_${productCategory}_database.db';
+        debugPrint('Using web database path for $productCategory: $path');
       } else {
         // For native platforms, use the file system
-        path = join(await getDatabasesPath(), 'orders.db');
-        debugPrint('Using native database path: $path');
+        path = join(await getDatabasesPath(), 'orders_${productCategory}.db');
+        debugPrint('Using native database path for $productCategory: $path');
       }
       
       return await openDatabase(
@@ -122,56 +135,174 @@ class DatabaseHelper {
   }
 
   Future<void> _insertSampleData(Database db) async {
-    final sampleOrders = [
-      {
-        'id': 'order_001',
-        'storeName': 'FreshMart Grocery',
-        'personInCharge': 'Anna Lopez',
-        'packsOrdered': 25,
-        'packsProduced': 15,
-        'status': 'Processing',
-        'paymentStatus': 'Paid',
-        'notes': 'Deliver before Friday morning',
-        'orderDate': DateTime.now().toIso8601String(),
-        'deliveryDate': null,
-      },
-      {
-        'id': 'order_002',
-        'storeName': 'City Deli',
-        'personInCharge': 'Mark Santos',
-        'packsOrdered': 40,
-        'packsProduced': 20,
-        'status': 'Processing',
-        'paymentStatus': 'Pending',
-        'notes': 'Urgent order',
-        'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
-        'deliveryDate': null,
-      },
-      {
-        'id': 'order_003',
-        'storeName': 'Banana King',
-        'personInCharge': 'Carla Reyes',
-        'packsOrdered': 12,
-        'packsProduced': 12,
-        'status': 'Processing',
-        'paymentStatus': 'Paid',
-        'notes': 'No rush delivery',
-        'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
-        'deliveryDate': null,
-      },
-      {
-        'id': 'order_004',
-        'storeName': 'GreenLeaf Market',
-        'personInCharge': 'Joey Fernandez',
-        'packsOrdered': 30,
-        'packsProduced': 0,
-        'status': 'Processing',
-        'paymentStatus': 'Paid',
-        'notes': 'Fragile packaging',
-        'orderDate': DateTime.now().subtract(Duration(days: 3)).toIso8601String(),
-        'deliveryDate': null,
-      },
-    ];
+    // Different sample data based on product category
+    List<Map<String, dynamic>> sampleOrders = [];
+    
+    switch (productCategory) {
+      case 'banana':
+        sampleOrders = [
+          {
+            'id': 'banana_001',
+            'storeName': 'FreshMart Grocery',
+            'personInCharge': 'Anna Lopez',
+            'packsOrdered': 25,
+            'packsProduced': 15,
+            'status': 'Processing',
+            'paymentStatus': 'Paid',
+            'notes': 'Deliver banana chips before Friday morning',
+            'orderDate': DateTime.now().toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'banana_002',
+            'storeName': 'City Deli',
+            'personInCharge': 'Mark Santos',
+            'packsOrdered': 40,
+            'packsProduced': 20,
+            'status': 'Processing',
+            'paymentStatus': 'Pending',
+            'notes': 'Urgent banana chips order',
+            'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'banana_003',
+            'storeName': 'Banana King',
+            'personInCharge': 'Carla Reyes',
+            'packsOrdered': 12,
+            'packsProduced': 12,
+            'status': 'Processing',
+            'paymentStatus': 'Paid',
+            'notes': 'No rush banana chips delivery',
+            'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'banana_004',
+            'storeName': 'GreenLeaf Market',
+            'personInCharge': 'Joey Fernandez',
+            'packsOrdered': 30,
+            'packsProduced': 0,
+            'status': 'Processing',
+            'paymentStatus': 'Paid',
+            'notes': 'Fragile banana chips packaging',
+            'orderDate': DateTime.now().subtract(Duration(days: 3)).toIso8601String(),
+            'deliveryDate': null,
+          },
+        ];
+        break;
+        
+      case 'karlang':
+        sampleOrders = [
+          {
+            'id': 'karlang_001',
+            'storeName': 'Snack Haven',
+            'personInCharge': 'Miguel Cruz',
+            'packsOrdered': 20,
+            'packsProduced': 10,
+            'status': 'Processing',
+            'paymentStatus': 'Paid',
+            'notes': 'Regular karlang chips customer',
+            'orderDate': DateTime.now().toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'karlang_002',
+            'storeName': 'Corner Store',
+            'personInCharge': 'Teresa Lim',
+            'packsOrdered': 15,
+            'packsProduced': 15,
+            'status': 'Completed',
+            'paymentStatus': 'Paid',
+            'notes': 'Karlang chips special packaging',
+            'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'karlang_003',
+            'storeName': 'Filipino Delights',
+            'personInCharge': 'Ramon Diaz',
+            'packsOrdered': 35,
+            'packsProduced': 0,
+            'status': 'Pending',
+            'paymentStatus': 'Pending',
+            'notes': 'Big karlang chips order for event',
+            'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
+            'deliveryDate': null,
+          },
+        ];
+        break;
+        
+      case 'kamote':
+        sampleOrders = [
+          {
+            'id': 'kamote_001',
+            'storeName': 'Sweet Treats',
+            'personInCharge': 'Elena Santos',
+            'packsOrdered': 18,
+            'packsProduced': 10,
+            'status': 'Processing',
+            'paymentStatus': 'Pending',
+            'notes': 'Kamote chips for weekend market',
+            'orderDate': DateTime.now().toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'kamote_002',
+            'storeName': 'Local Grocery',
+            'personInCharge': 'Pedro Mendoza',
+            'packsOrdered': 25,
+            'packsProduced': 25,
+            'status': 'Completed',
+            'paymentStatus': 'Paid',
+            'notes': 'Regular kamote chips order',
+            'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'kamote_003',
+            'storeName': 'School Canteen',
+            'personInCharge': 'Marissa Cruz',
+            'packsOrdered': 40,
+            'packsProduced': 20,
+            'status': 'Processing',
+            'paymentStatus': 'Paid',
+            'notes': 'Monthly kamote chips supply',
+            'orderDate': DateTime.now().subtract(Duration(days: 3)).toIso8601String(),
+            'deliveryDate': null,
+          },
+          {
+            'id': 'kamote_004',
+            'storeName': 'Island Cafe',
+            'personInCharge': 'James Reyes',
+            'packsOrdered': 10,
+            'packsProduced': 0,
+            'status': 'Pending',
+            'paymentStatus': 'Pending',
+            'notes': 'Small kamote chips batch',
+            'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
+            'deliveryDate': null,
+          },
+        ];
+        break;
+      
+      default:
+        // Default case should not happen, but providing fallback data just in case
+        sampleOrders = [
+          {
+            'id': 'default_001',
+            'storeName': 'Sample Store',
+            'personInCharge': 'Sample Person',
+            'packsOrdered': 10,
+            'packsProduced': 0,
+            'status': 'Pending',
+            'paymentStatus': 'Pending',
+            'notes': 'Sample order',
+            'orderDate': DateTime.now().toIso8601String(),
+            'deliveryDate': null,
+          },
+        ];
+    }
 
     for (var order in sampleOrders) {
       await db.insert('orders', order);
@@ -292,6 +423,37 @@ class DatabaseHelper {
       });
     } catch (e) {
       debugPrint('Error getting orders by status $status: $e');
+      return [];
+    }
+  }
+  
+  Future<List<Order>> getOrdersByPaymentStatus(String paymentStatus) async {
+    try {
+      final maps = await safeQuery(
+        'orders',
+        where: 'paymentStatus = ?',
+        whereArgs: [paymentStatus],
+      );
+
+      return List.generate(maps.length, (i) {
+        try {
+          return Order.fromMap(maps[i]);
+        } catch (e) {
+          debugPrint('Error parsing order with payment status $paymentStatus at index $i: $e');
+          return Order(
+            id: 'error_${DateTime.now().millisecondsSinceEpoch}_$i',
+            storeName: 'Error Loading Order',
+            personInCharge: '',
+            packsOrdered: 0,
+            status: 'Unknown',
+            paymentStatus: paymentStatus,
+            notes: 'There was an error loading this order: $e',
+            orderDate: DateTime.now(),
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('Error getting orders by payment status $paymentStatus: $e');
       return [];
     }
   }

@@ -37,7 +37,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           throw Exception('Produced packs cannot exceed ordered packs (${widget.order.packsOrdered})');
         }
         
+        // Update the packs produced
         await provider.updatePacksProduced(widget.order.id, packsProduced);
+        
+        // Auto-mark as completed if packs produced equals packs ordered and status is not already completed
+        final currentOrder = provider.orders.firstWhere((order) => order.id == widget.order.id);
+        if (packsProduced == widget.order.packsOrdered && 
+            currentOrder.status != 'Completed' && 
+            currentOrder.status != 'Cancelled') {
+          await _updateOrderStatus(provider, currentOrder, 'Completed');
+          
+          // Show notification that order was automatically completed
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Order automatically marked as completed!'),
+                backgroundColor: AppTheme.completedColor,
+              ),
+            );
+          }
+        }
         
         // Mark that changes were applied
         _changesApplied = true;
@@ -356,69 +375,19 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             return true; // Allow the navigation to proceed
           },
           child: Scaffold(
-          appBar: AppBar(
-            title: Row(
-              children: [
-                const Icon(Icons.inventory_2, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  currentOrder.storeName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            actions: [
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'complete':
-                      await _updateOrderStatus(provider, currentOrder, 'Completed');
-                      break;
-                    case 'hold':
-                      await _updateOrderStatus(provider, currentOrder, 'Hold');
-                      break;
-                    case 'delete':
-                      _confirmDelete(provider, currentOrder);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'complete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle, color: AppTheme.completedColor),
-                        const SizedBox(width: 8),
-                        const Text('Mark as Complete'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'hold',
-                    child: Row(
-                      children: [
-                        Icon(Icons.pause_circle, color: Colors.amber),
-                        const SizedBox(width: 8),
-                        const Text('Put on Hold'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.delete, color: AppTheme.cancelledColor),
-                        const SizedBox(width: 8),
-                        const Text('Delete Order'),
-                      ],
-                    ),
+            appBar: AppBar(
+              title: Row(
+                children: [
+                  const Icon(Icons.inventory_2, size: 24),
+                  const SizedBox(width: 8),
+                  Text(
+                    currentOrder.storeName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
-              )
-            ],
-          ),
-          body: Padding(
+              ),
+            ),
+            body: Padding(
             padding: const EdgeInsets.all(AppTheme.mediumSpacing),
             child: Column(
               children: [
@@ -582,13 +551,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
             child: Row(
               children: [
-                // Complete Button
+                // Complete/Cancel Button - Show Cancel if order is complete
                 Expanded(
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('Complete'),
+                    icon: Icon(
+                      currentOrder.packsProduced >= currentOrder.packsOrdered
+                          ? Icons.cancel
+                          : Icons.check_circle
+                    ),
+                    label: Text(
+                      currentOrder.packsProduced >= currentOrder.packsOrdered
+                          ? 'Cancel'
+                          : 'Complete'
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.completedColor,
+                      backgroundColor: currentOrder.packsProduced >= currentOrder.packsOrdered
+                          ? AppTheme.cancelledColor
+                          : AppTheme.completedColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -596,18 +575,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                       elevation: 2,
                     ),
-                    onPressed: () => _updateOrderStatus(provider, currentOrder, 'Completed'),
+                    onPressed: () {
+                      if (currentOrder.packsProduced >= currentOrder.packsOrdered) {
+                        _updateOrderStatus(provider, currentOrder, 'Cancelled');
+                      } else {
+                        _updateOrderStatus(provider, currentOrder, 'Completed');
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
                 
-                // Hold Button
+                // Hold/Processing Button - Toggle between hold and processing
                 Expanded(
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.pause_circle_filled),
-                    label: const Text('Hold'),
+                    icon: Icon(
+                      currentOrder.status == 'Hold'
+                          ? Icons.play_circle_filled
+                          : Icons.pause_circle_filled
+                    ),
+                    label: Text(
+                      currentOrder.status == 'Hold'
+                          ? 'Processing'
+                          : 'Hold'
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
+                      backgroundColor: currentOrder.status == 'Hold'
+                          ? AppTheme.processingColor
+                          : Colors.amber,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -615,7 +610,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                       elevation: 2,
                     ),
-                    onPressed: () => _updateOrderStatus(provider, currentOrder, 'Hold'),
+                    onPressed: () {
+                      if (currentOrder.status == 'Hold') {
+                        _updateOrderStatus(provider, currentOrder, 'Processing');
+                      } else {
+                        _updateOrderStatus(provider, currentOrder, 'Hold');
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),

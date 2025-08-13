@@ -7,13 +7,15 @@ import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'screens/landing_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/orders_screen.dart'; // Updated to use the fixed version
+import 'screens/orders_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/status_screen.dart';
 import 'screens/settings_screen.dart';
 import 'widgets/custom_bottom_nav.dart';
 import 'providers/order_provider.dart';
+import 'providers/product_manager.dart';
 import 'providers/theme_provider.dart';
 import 'config/app_theme.dart';
 
@@ -106,7 +108,16 @@ class _InventoryAppState extends State<InventoryApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (context) => OrderProvider()..loadOrders(), // Initialize and load data
+          create: (context) => ProductManager(),
+        ),
+        ChangeNotifierProxyProvider<ProductManager, OrderProvider>(
+          create: (context) => OrderProvider(),
+          update: (context, productManager, previous) {
+            // Create or update the OrderProvider based on the currently selected product
+            final provider = previous ?? OrderProvider(productCategory: productManager.currentProduct);
+            provider.setProductCategory(productManager.currentProduct);
+            return provider..loadOrders();
+          },
         ),
         ChangeNotifierProvider(
           create: (context) => ThemeProvider()..initialize(), // Initialize theme provider
@@ -114,18 +125,20 @@ class _InventoryAppState extends State<InventoryApp> {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) => MaterialApp(
-          title: 'Mama Em\'s Inventory',
+          title: 'OMATA - Order Monitoring and Tracking App',
           debugShowCheckedModeBanner: false,
           theme: themeProvider.isLoaded 
             ? themeProvider.getTheme() 
             : AppTheme.getTheme(), // Use theme provider when loaded
-          home: const MainPage(),
+          home: const LandingScreen(), // Start with the landing page
           builder: (context, child) {
             // Add error boundary
             return _ErrorBoundary(child: child ?? const SizedBox());
           },
           // Define routes for navigation
           routes: {
+            '/landing': (context) => const LandingScreen(),
+            '/main': (context) => const MainPage(),
             '/home': (context) => const HomeScreen(),
             '/orders': (context) => const OrdersScreen(),
             '/schedule': (context) => const ScheduleScreen(),
