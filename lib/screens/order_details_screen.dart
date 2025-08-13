@@ -16,6 +16,8 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late int packsProduced;
+  bool _changesApplied = false;
+  bool _skipNextNotification = false;
 
   @override
   void initState() {
@@ -37,13 +39,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         
         await provider.updatePacksProduced(widget.order.id, packsProduced);
         
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Production quantity updated successfully')),
-          );
+        // Mark that changes were applied
+        _changesApplied = true;
+        
+        // Only show error messages immediately, success message will be shown on exit
+        if (!_skipNextNotification) {
+          // For batch operations, we can skip individual notifications
+          _skipNextNotification = false;
         }
       } catch (e) {
-        // Handle errors
+        // Handle errors immediately
         if (mounted) {
           setState(() {
             // Revert to original value on error
@@ -66,6 +71,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (packsProduced < widget.order.packsOrdered) {
       setState(() {
         packsProduced++;
+        _skipNextNotification = true; // Skip notification for this update
       });
       _updateQuantity(provider);
     } else {
@@ -82,6 +88,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (packsProduced > 0) {
       setState(() {
         packsProduced--;
+        _skipNextNotification = true; // Skip notification for this update
       });
       _updateQuantity(provider);
     } else {
@@ -166,6 +173,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (result != null) {
       setState(() {
         packsProduced = result;
+        _skipNextNotification = true; // Skip notification for this update
       });
       _updateQuantity(provider);
     }
@@ -334,7 +342,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         final currentOrder = provider.orders
             .firstWhere((o) => o.id == widget.order.id, orElse: () => widget.order);
 
-        return Scaffold(
+        return WillPopScope(
+          onWillPop: () async {
+            // Show a success notification when exiting if changes were made
+            if (_changesApplied && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Production quantity changes saved successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+            return true; // Allow the navigation to proceed
+          },
+          child: Scaffold(
           appBar: AppBar(
             title: Row(
               children: [
@@ -427,7 +448,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             // Add a glow effect when the target is met
-                            if (packsOrdered >= currentOrder.packsOrdered)
+                            if (currentOrder.packsProduced >= currentOrder.packsOrdered)
                               BoxShadow(
                                 color: AppTheme.completedColor.withOpacity(0.5),
                                 blurRadius: 15,
@@ -471,14 +492,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   "packs",
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: packsOrdered >= currentOrder.packsOrdered
+                                    color: currentOrder.packsProduced >= currentOrder.packsOrdered
                                         ? AppTheme.completedColor
                                         : AppTheme.primaryColor,
                                   ),
                                 ),
                                 const SizedBox(height: 5),
                                 // Status indicator
-                                if (packsOrdered >= currentOrder.packsOrdered)
+                                if (currentOrder.packsProduced >= currentOrder.packsOrdered)
                                   const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -621,6 +642,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
           ),
+        ),
         );
       },
     );
