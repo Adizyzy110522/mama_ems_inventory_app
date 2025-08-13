@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -267,7 +268,8 @@ class OrdersScreen extends StatelessWidget {
     final TextEditingController packsController = TextEditingController(text: '1');
     final TextEditingController notesController = TextEditingController();
     String status = 'Processing';
-    String paymentStatus = 'Pending';
+    String? paymentStatus; // Set to null initially for default prompt
+    DateTime? deadline; // Order deadline date
     
     // Get theme for consistent styling
     final theme = Theme.of(context);
@@ -343,6 +345,7 @@ class OrdersScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    // Contact number with embedded Philippines area code
                     TextField(
                       controller: contactController,
                       keyboardType: TextInputType.phone,
@@ -350,8 +353,14 @@ class OrdersScreen extends StatelessWidget {
                         labelText: 'Contact Number',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(Icons.phone, color: theme.primaryColor),
-                        hintText: 'e.g., +63 912 345 6789',
+                        prefixText: '+63 ',
+                        hintText: '9XX XXX XXXX',
                       ),
+                      // Only allow numeric input
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10), // Limit to 10 digits (9XX XXX XXXX)
+                      ],
                     ),
                     const SizedBox(height: 16),
                     
@@ -386,7 +395,8 @@ class OrdersScreen extends StatelessWidget {
                           status = newValue!;
                         });
                       },
-                      items: Order.validStatuses.map<DropdownMenuItem<String>>((String value) {
+                      // Only show Processing, Hold, and Pending options
+                      items: ['Processing', 'Hold', 'Pending'].map<DropdownMenuItem<String>>((String value) {
                         return DropdownMenuItem<String>(
                           value: value,
                           child: Text(value),
@@ -401,9 +411,10 @@ class OrdersScreen extends StatelessWidget {
                         prefixIcon: Icon(Icons.payment, color: theme.primaryColor),
                       ),
                       value: paymentStatus,
+                      hint: const Text('Select payment status'),
                       onChanged: (newValue) {
                         setState(() {
-                          paymentStatus = newValue!;
+                          paymentStatus = newValue;
                         });
                       },
                       items: Order.validPaymentStatuses.map<DropdownMenuItem<String>>((String value) {
@@ -413,6 +424,59 @@ class OrdersScreen extends StatelessWidget {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 12),
+                    
+                    // Deadline date picker
+                    InkWell(
+                      onTap: () async {
+                        final selectedDate = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now().add(const Duration(days: 7)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: theme.primaryColor,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (selectedDate != null) {
+                          setState(() {
+                            deadline = selectedDate;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Order Deadline',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today, color: theme.primaryColor),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              deadline == null 
+                                ? 'Select a deadline date' 
+                                : DateFormat('MMM dd, yyyy').format(deadline!),
+                              style: TextStyle(
+                                color: deadline == null ? Colors.grey : Colors.black,
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: theme.primaryColor,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
                     const SizedBox(height: 16),
                     
                     // Additional Information Section
@@ -484,18 +548,40 @@ class OrdersScreen extends StatelessWidget {
                       return;
                     }
 
+                    // Validate payment status is selected
+                    if (paymentStatus == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select a payment status'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    
+                    // Validate deadline date is selected
+                    if (deadline == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select a deadline date'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    
                     // Create and add the new order
                     final order = Order(
                       id: const Uuid().v4(), // Generate a unique ID
                       storeName: storeNameController.text,
                       personInCharge: personController.text,
-                      contactNumber: contactController.text, // Added contact number
+                      contactNumber: '+63 ' + contactController.text, // Add +63 prefix to contact number
                       packsOrdered: packs,
                       status: status,
-                      paymentStatus: paymentStatus,
+                      paymentStatus: paymentStatus!, // Now safe to use with ! since we checked for null
                       notes: notesController.text,
                       orderDate: DateTime.now(),
-                      deliveryDate: null,
+                      deliveryDate: deadline, // Use the selected deadline date
                     );
 
                     Provider.of<OrderProvider>(context, listen: false)

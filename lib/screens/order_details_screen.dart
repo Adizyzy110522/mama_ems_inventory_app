@@ -553,11 +553,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           _detailItem("Person in Charge", currentOrder.personInCharge),
                           if (currentOrder.contactNumber.isNotEmpty)
                             _detailItem("Contact Number", currentOrder.contactNumber),
-                          if (currentOrder.deliveryDate != null)
-                            _detailItem("Delivery Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
                           _detailItem("Order Date", DateFormat('MMM dd, yyyy').format(currentOrder.orderDate)),
                           if (currentOrder.deliveryDate != null)
-                            _detailItem("Delivery Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
+                            _detailItem("Deadline Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
                           _detailItem("Status", currentOrder.status),
                           _detailItem("Payment Status", currentOrder.paymentStatus),
                           if (currentOrder.notes.isNotEmpty)
