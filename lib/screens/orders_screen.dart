@@ -8,29 +8,111 @@ import '../providers/order_provider.dart';
 import '../models/order.dart';
 import 'order_details_screen.dart';
 
-class OrdersScreen extends StatelessWidget {
+class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
+
+  @override
+  State<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends State<OrdersScreen> {
+  String? _searchQuery;
+  List<Order>? _searchResults;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+  
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        // Clear search when closing search bar
+        _searchController.clear();
+        _searchQuery = null;
+        _searchResults = null;
+      }
+    });
+  }
+  
+  void _performSearch(String query) {
+    final provider = Provider.of<OrderProvider>(context, listen: false);
+    final results = provider.searchOrders(query);
+    
+    setState(() {
+      _searchQuery = query;
+      _searchResults = results;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.list_alt, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'Orders',
-              style: TextStyle(fontWeight: FontWeight.bold),
+        title: _isSearching 
+          ? TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.black),
+              decoration: const InputDecoration(
+                hintText: 'Search store or person...',
+                hintStyle: TextStyle(color: Colors.black54),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 15),
+                prefixIcon: Icon(Icons.search, color: Colors.black54),
+              ),
+              onChanged: (value) {
+                // Perform real-time search as user types
+                if (value.isEmpty) {
+                  setState(() {
+                    _searchQuery = null;
+                    _searchResults = null;
+                  });
+                } else if (value.length >= 2) {
+                  // Only search if at least 2 characters
+                  _performSearch(value);
+                }
+              },
+              textInputAction: TextInputAction.search,
+              onSubmitted: (value) {
+                if (value.isNotEmpty) {
+                  _performSearch(value);
+                }
+              },
+            )
+          : const Row(
+              children: [
+                Icon(Icons.list_alt, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Orders',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-          ],
-        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: Icon(_isSearching ? Icons.close : Icons.search, 
+              color: _isSearching ? Colors.black54 : null),
             onPressed: () {
-              // TODO: Implement search functionality
+              if (_isSearching) {
+                // If closing search and there's text, clear it
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = null;
+                  _searchResults = null;
+                  _isSearching = false;
+                });
+              } else {
+                // Opening search
+                _toggleSearch();
+              }
             },
+            tooltip: _isSearching ? 'Close search' : 'Search orders',
           ),
         ],
       ),
@@ -44,53 +126,116 @@ class OrdersScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final orders = provider.orders;
+          // Get orders based on whether we're searching or not
+          final orders = _searchResults ?? provider.orders;
 
           if (orders.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.list_alt,
                     size: 64,
                     color: Colors.grey,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
-                    'No orders found',
-                    style: TextStyle(
+                    _searchQuery != null 
+                      ? 'No orders found matching "$_searchQuery"' 
+                      : 'No orders found',
+                    style: const TextStyle(
                       fontSize: 18,
                       color: Colors.grey,
                     ),
                   ),
+                  if (_searchQuery != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = null;
+                            _searchResults = null;
+                          });
+                        },
+                        child: const Text('Clear Search'),
+                      ),
+                    ),
                 ],
               ),
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              await provider.loadOrders();
-            },
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: orders.length,
-              itemBuilder: (context, index) {
-                final order = orders[index];
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OrderDetailsScreen(order: order),
+          return Column(
+            children: [
+              // Show search query if we're searching
+              if (_searchQuery != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  color: AppTheme.backgroundColor,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Showing results for "$_searchQuery"',
+                          style: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: AppTheme.textSecondaryColor,
+                          ),
+                        ),
                       ),
-                    );
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = null;
+                            _searchResults = null;
+                          });
+                        },
+                        tooltip: 'Clear Search',
+                      ),
+                    ],
+                  ),
+                ),
+                
+              // Order list
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await provider.loadOrders();
+                    // Clear search when refreshing
+                    setState(() {
+                      _searchQuery = null;
+                      _searchResults = null;
+                    });
                   },
-                  child: _orderCard(order),
-                );
-              },
-            ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: orders.length,
+                    itemBuilder: (context, index) {
+                      final order = orders[index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailsScreen(order: order),
+                            ),
+                          ).then((_) {
+                            // Refresh search results when coming back from details
+                            if (_searchQuery != null) {
+                              _performSearch(_searchQuery!);
+                            }
+                          });
+                        },
+                        child: _orderCard(order),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),

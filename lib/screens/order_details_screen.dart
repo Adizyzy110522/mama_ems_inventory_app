@@ -396,14 +396,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 // Packs Ordered Monitor with Interactive Progress Circle
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
                   children: [
+                    const SizedBox(width: 8), // Added for spacing
                     // Minus Button
                     IconButton(
                       icon: const Icon(
                         Icons.remove_circle, 
-                        size: 40, 
+                        size: 70, // Increased from 50 to 70
                         color: AppTheme.cancelledColor
                       ),
+                      padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
                       onPressed: () => _decrement(provider),
                     ),
 
@@ -411,8 +414,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     GestureDetector(
                       onTap: () => _manualInput(provider),
                       child: Container(
-                        width: 150,
-                        height: 150,
+                        width: 300, // Increased from 200 to 300
+                        height: 300, // Increased from 200 to 300
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
@@ -420,8 +423,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             if (currentOrder.packsProduced >= currentOrder.packsOrdered)
                               BoxShadow(
                                 color: AppTheme.completedColor.withOpacity(0.5),
-                                blurRadius: 15,
-                                spreadRadius: 5,
+                                blurRadius: 20, // Increased from 15 to 20
+                                spreadRadius: 8, // Increased from 5 to 8
                               ),
                           ],
                         ),
@@ -430,13 +433,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           children: [
                             // Progress Circle
                             SizedBox(
-                              width: 150,
-                              height: 150,
+                              width: 300, // Increased from 200 to 300
+                              height: 300, // Increased from 200 to 300
                               child: CircularProgressIndicator(
                                 value: currentOrder.packsOrdered > 0 
                                     ? (currentOrder.packsProduced / currentOrder.packsOrdered).clamp(0.0, 1.0) 
                                     : 1.0,
-                                strokeWidth: 10,
+                                strokeWidth: 20, // Increased from 15 to 20
                                 backgroundColor: Colors.grey.shade200,
                                 color: currentOrder.packsProduced >= currentOrder.packsOrdered 
                                     ? AppTheme.completedColor 
@@ -450,7 +453,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 Text(
                                   "${currentOrder.packsProduced}/${currentOrder.packsOrdered}",
                                   style: TextStyle(
-                                    fontSize: 28,
+                                    fontSize: 48, // Increased from 36 to 48
                                     fontWeight: FontWeight.bold,
                                     color: currentOrder.packsProduced >= currentOrder.packsOrdered
                                         ? AppTheme.completedColor
@@ -460,13 +463,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 Text(
                                   "packs",
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 24, // Increased from 18 to 24
+                                    fontWeight: FontWeight.w500, // Added medium weight
                                     color: currentOrder.packsProduced >= currentOrder.packsOrdered
                                         ? AppTheme.completedColor
                                         : AppTheme.primaryColor,
                                   ),
                                 ),
-                                const SizedBox(height: 5),
+                                const SizedBox(height: 8), // Increased from 5 to 8
                                 // Status indicator
                                 if (currentOrder.packsProduced >= currentOrder.packsOrdered)
                                   const Row(
@@ -474,13 +478,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                     children: [
                                       Icon(Icons.check_circle, 
                                         color: AppTheme.completedColor, 
-                                        size: 16,
+                                        size: 20, // Increased from 16 to 20
                                       ),
                                       SizedBox(width: 4),
                                       Text(
                                         "Target Met",
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 14, // Increased from 12 to 14
+                                          fontWeight: FontWeight.w500, // Added medium weight
                                           color: AppTheme.completedColor,
                                         ),
                                       ),
@@ -497,9 +502,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     IconButton(
                       icon: const Icon(
                         Icons.add_circle, 
-                        size: 40, 
+                        size: 70, // Increased from 50 to 70
                         color: AppTheme.completedColor
                       ),
+                      padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
                       onPressed: () => _increment(provider),
                     ),
                   ],
