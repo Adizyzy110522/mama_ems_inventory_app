@@ -24,6 +24,9 @@ dependencies:
   
   # UUID generation for order IDs
   uuid: ^4.2.1
+  
+  # Persistence for settings
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

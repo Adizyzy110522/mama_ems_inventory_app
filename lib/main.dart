@@ -11,8 +11,10 @@ import 'screens/home_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/status_screen.dart';
+import 'screens/settings_screen.dart';
 import 'widgets/custom_bottom_nav.dart';
 import 'providers/order_provider.dart';
+import 'providers/theme_provider.dart';
 import 'config/app_theme.dart';
 
 void main() {
@@ -101,24 +103,36 @@ class _InventoryAppState extends State<InventoryApp> {
     }
 
     // App is initialized
-    return ChangeNotifierProvider(
-      create: (context) => OrderProvider()..loadOrders(), // Initialize and load data
-      child: MaterialApp(
-        title: 'Mama Em\'s Inventory',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.getTheme(),
-        home: const MainPage(),
-        builder: (context, child) {
-          // Add error boundary
-          return _ErrorBoundary(child: child ?? const SizedBox());
-        },
-        // Define routes for navigation
-        routes: {
-          '/home': (context) => const HomeScreen(),
-          '/orders': (context) => const OrdersScreen(),
-          '/schedule': (context) => const ScheduleScreen(),
-          '/status': (context) => const StatusScreen(),
-        },
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => OrderProvider()..loadOrders(), // Initialize and load data
+        ),
+        ChangeNotifierProvider(
+          create: (context) => ThemeProvider()..initialize(), // Initialize theme provider
+        ),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'Mama Em\'s Inventory',
+          debugShowCheckedModeBanner: false,
+          theme: themeProvider.isLoaded 
+            ? themeProvider.getTheme() 
+            : AppTheme.getTheme(), // Use theme provider when loaded
+          home: const MainPage(),
+          builder: (context, child) {
+            // Add error boundary
+            return _ErrorBoundary(child: child ?? const SizedBox());
+          },
+          // Define routes for navigation
+          routes: {
+            '/home': (context) => const HomeScreen(),
+            '/orders': (context) => const OrdersScreen(),
+            '/schedule': (context) => const ScheduleScreen(),
+            '/status': (context) => const StatusScreen(),
+            '/settings': (context) => const SettingsScreen(),
+          },
+        ),
       ),
     );
   }
@@ -217,6 +231,7 @@ class _MainPageState extends State<MainPage> {
     OrdersScreen(),
     ScheduleScreen(),
     StatusScreen(),
+    SettingsScreen(),
   ];
 
   void _onTabSelected(int index) {

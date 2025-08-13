@@ -40,6 +40,10 @@ class CustomBottomNav extends StatelessWidget {
           icon: Icon(Icons.check_circle_outline),
           label: 'Status',
         ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
       ],
     );
   }
