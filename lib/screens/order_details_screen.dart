@@ -242,13 +242,35 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
   // Update order status method
   Future<void> _updateOrderStatus(OrderProvider provider, Order order, String newStatus) async {
     try {
-      final updatedOrder = order.copyWith(status: newStatus);
+      // If status is being set to Completed, also set packs produced to equal ordered
+      Order updatedOrder;
+      String message;
+      
+      if (newStatus == 'Completed') {
+        // Update both status and packs produced
+        updatedOrder = order.copyWith(
+          status: newStatus, 
+          packsProduced: order.packsOrdered
+        );
+        
+        // Update the state variable to reflect the change
+        setState(() {
+          packsProduced = order.packsOrdered;
+        });
+        
+        message = 'Order marked as completed with all packs produced';
+      } else {
+        // Just update the status
+        updatedOrder = order.copyWith(status: newStatus);
+        message = 'Order marked as ${newStatus.toLowerCase()}';
+      }
+      
       await provider.updateOrder(updatedOrder);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Order marked as ${newStatus.toLowerCase()}'),
+            content: Text(message),
             backgroundColor: newStatus == 'Completed' 
                 ? AppTheme.completedColor 
                 : (newStatus == 'Processing' ? Colors.amber : 
@@ -393,6 +415,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
         return Icons.info_outline;
     }
   }
+  
+  // Helper method to calculate responsive icon sizes based on screen width
+  double _getResponsiveIconSize(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
+    final smallerDimension = width < height ? width : height;
+    
+    // Responsive size calculation
+    if (smallerDimension < 360) {
+      return 50; // Very small screens
+    } else if (smallerDimension < 600) {
+      return 60; // Small to medium screens
+    } else if (smallerDimension < 900) {
+      return 70; // Medium to large screens
+    } else {
+      return 80; // Very large screens
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -461,10 +501,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                     scale: scale,
                                     duration: const Duration(milliseconds: 150),
                                     child: Container(
-                                      padding: const EdgeInsets.all(20),
-                                      child: const Icon(
+                                      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 400 ? 12 : 20),
+                                      child: Icon(
                                         Icons.remove_circle, 
-                                        size: 70,
+                                        size: _getResponsiveIconSize(context),
                                         color: AppTheme.cancelledColor,
                                       ),
                                     ),
@@ -482,12 +522,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                             },
                             child: LayoutBuilder(
                               builder: (context, constraints) {
-                                // Calculate size based on available width
-                                // Ensure it's not too big or too small
+                                // Calculate size based on available width and height
+                                // Make it more responsive and proportional to the screen
                                 final screenWidth = MediaQuery.of(context).size.width;
-                                final size = screenWidth < 600 
-                                    ? screenWidth * 0.7  // 70% of screen width on small screens
-                                    : 350.0;            // Maximum size on larger screens
+                                final screenHeight = MediaQuery.of(context).size.height;
+                                
+                                // Use the smaller dimension for better proportions
+                                final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
+                                
+                                // Adjust size to be more reasonable on all screens
+                                final size = smallerDimension < 600 
+                                    ? smallerDimension * 0.45  // 45% of smaller dimension on small screens
+                                    : 250.0;                  // Maximum size on larger screens
                                 
                                 return Hero(
                                   tag: 'progressCircle-${currentOrder.id}',
@@ -540,8 +586,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                                   height: size,
                                                   child: CircularProgressIndicator(
                                                     value: value,
-                                                    strokeWidth: size * 0.06, // Proportional stroke width (6% of circle size)
-                                                    backgroundColor: Colors.grey.shade200,
+                                                    strokeWidth: size * 0.04, // Slimmer stroke width (4% of circle size)
+                                                    backgroundColor: Colors.grey.shade200.withOpacity(0.3),
                                                     color: currentOrder.packsProduced >= currentOrder.packsOrdered 
                                                         ? AppTheme.completedColor 
                                                         : AppTheme.primaryColor,
@@ -566,7 +612,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                                         child: Text(
                                                           "${currentOrder.packsProduced}/${currentOrder.packsOrdered}",
                                                           style: TextStyle(
-                                                            fontSize: size * 0.16, // Proportional font size
+                                                            fontSize: size * 0.18, // Slightly larger proportional font size
                                                             fontWeight: FontWeight.bold,
                                                             color: currentOrder.packsProduced >= currentOrder.packsOrdered
                                                                 ? AppTheme.completedColor
@@ -579,7 +625,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                                     AnimatedDefaultTextStyle(
                                                       duration: const Duration(milliseconds: 300),
                                                       style: TextStyle(
-                                                        fontSize: size * 0.08, // Proportional font size
+                                                        fontSize: size * 0.09, // Slightly larger proportional font size
                                                         fontWeight: FontWeight.w500,
                                                         color: currentOrder.packsProduced >= currentOrder.packsOrdered
                                                             ? AppTheme.completedColor
@@ -588,7 +634,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                                       child: const Text("packs"),
                                                     ),
                                                     
-                                                    SizedBox(height: size * 0.03),
+                                                    SizedBox(height: size * 0.04), // Increased spacing
                                                     
                                                     // Status indicator with animation
                                                     if (currentOrder.packsProduced >= currentOrder.packsOrdered)
@@ -647,10 +693,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTick
                                     scale: scale,
                                     duration: const Duration(milliseconds: 150),
                                     child: Container(
-                                      padding: const EdgeInsets.all(20),
-                                      child: const Icon(
+                                      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 400 ? 12 : 20),
+                                      child: Icon(
                                         Icons.add_circle, 
-                                        size: 70,
+                                        size: _getResponsiveIconSize(context),
                                         color: AppTheme.completedColor,
                                       ),
                                     ),

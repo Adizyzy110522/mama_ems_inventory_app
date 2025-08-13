@@ -92,7 +92,7 @@ class LandingScreen extends StatelessWidget {
                 context,
                 'Banana Chips',
                 'Assets for banana chips production',
-                Icons.eco,
+                Icons.water_drop, // More banana-like icon
                 Colors.amber,
                 () => _selectProductCategory(context, 'banana'),
               ),
@@ -104,7 +104,7 @@ class LandingScreen extends StatelessWidget {
                 context,
                 'Karlang Chips',
                 'Assets for karlang chips production',
-                Icons.fastfood,
+                Icons.grass, // Represents cocoyam/taro plant
                 Colors.deepOrange,
                 () => _selectProductCategory(context, 'karlang'),
               ),
@@ -116,7 +116,7 @@ class LandingScreen extends StatelessWidget {
                 context,
                 'Kamote Chips',
                 'Assets for kamote chips production',
-                Icons.spa,
+                Icons.agriculture, // Represents sweet potato/root crop
                 Colors.brown,
                 () => _selectProductCategory(context, 'kamote'),
               ),
