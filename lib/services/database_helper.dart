@@ -66,7 +66,7 @@ class DatabaseHelper {
         debugPrint('Using web database path for $productCategory: $path');
       } else {
         // For native platforms, use the file system
-        path = join(await getDatabasesPath(), 'orders_${productCategory}.db');
+        path = join(await getDatabasesPath(), 'orders_$productCategory.db');
         debugPrint('Using native database path for $productCategory: $path');
       }
       

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/order_provider.dart';
 import '../config/app_theme.dart';
+import '../config/animations.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -14,15 +16,41 @@ class OrderDetailsScreen extends StatefulWidget {
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
-class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
+class _OrderDetailsScreenState extends State<OrderDetailsScreen> with SingleTickerProviderStateMixin {
   late int packsProduced;
   bool _changesApplied = false;
   bool _skipNextNotification = false;
+  
+  // Animation controller for pulse effect
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     packsProduced = widget.order.packsProduced;
+    
+    // Initialize pulse animation controller
+    _pulseAnimationController = AnimationController(
+      vsync: this, 
+      duration: const Duration(milliseconds: 1500),
+    );
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(
+        parent: _pulseAnimationController, 
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Start repeating pulse animation
+    _pulseAnimationController.repeat(reverse: true);
+  }
+  
+  @override
+  void dispose() {
+    _pulseAnimationController.dispose();
+    super.dispose();
   }
 
   Future<void> _updateQuantity(OrderProvider provider) async {
@@ -85,6 +113,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
+  // Utility method to provide haptic feedback
+  void _provideHapticFeedback({bool isSuccess = true}) {
+    if (isSuccess) {
+      HapticFeedback.lightImpact(); // Light feedback for normal interactions
+    } else {
+      HapticFeedback.mediumImpact(); // Stronger feedback for errors or limits
+    }
+  }
+
   void _increment(OrderProvider provider) {
     // Prevent exceeding max value
     if (packsProduced < widget.order.packsOrdered) {
@@ -92,8 +129,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         packsProduced++;
         _skipNextNotification = true; // Skip notification for this update
       });
+      _provideHapticFeedback(); // Add haptic feedback
       _updateQuantity(provider);
     } else {
+      _provideHapticFeedback(isSuccess: false); // Error feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Maximum production quantity (${widget.order.packsOrdered}) reached'),
@@ -109,8 +148,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         packsProduced--;
         _skipNextNotification = true; // Skip notification for this update
       });
+      _provideHapticFeedback(); // Add haptic feedback
       _updateQuantity(provider);
     } else {
+      _provideHapticFeedback(isSuccess: false); // Error feedback
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Quantity cannot be negative'),
@@ -388,271 +429,380 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ),
             ),
             body: Padding(
-            padding: const EdgeInsets.all(AppTheme.mediumSpacing),
-            child: Column(
-              children: [
-                const SizedBox(height: AppTheme.largeSpacing),
+              padding: const EdgeInsets.all(AppTheme.mediumSpacing),
+              child: Column(
+                children: [
+                  const SizedBox(height: AppTheme.largeSpacing),
 
-                // Packs Ordered Monitor with Interactive Progress Circle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
-                      children: [
-                        // Minus Button
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_circle, 
-                            size: 70, // Increased from 50 to 70
-                            color: AppTheme.cancelledColor
-                          ),
-                          padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
-                          onPressed: () => _decrement(provider),
-                        ),
-
-                    // Interactive Progress Circle
-                    GestureDetector(
-                      onTap: () => _manualInput(provider),
-                      child: Container(
-                        width: 300, // Increased from 200 to 300
-                        height: 300, // Increased from 200 to 300
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            // Add a glow effect when the target is met
-                            if (currentOrder.packsProduced >= currentOrder.packsOrdered)
-                              BoxShadow(
-                                color: AppTheme.completedColor.withOpacity(0.5),
-                                blurRadius: 20, // Increased from 15 to 20
-                                spreadRadius: 8, // Increased from 5 to 8
-                              ),
-                          ],
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Progress Circle
-                            SizedBox(
-                              width: 300, // Increased from 200 to 300
-                              height: 300, // Increased from 200 to 300
-                              child: CircularProgressIndicator(
-                                value: currentOrder.packsOrdered > 0 
-                                    ? (currentOrder.packsProduced / currentOrder.packsOrdered).clamp(0.0, 1.0) 
-                                    : 1.0,
-                                strokeWidth: 20, // Increased from 15 to 20
-                                backgroundColor: Colors.grey.shade200,
-                                color: currentOrder.packsProduced >= currentOrder.packsOrdered 
-                                    ? AppTheme.completedColor 
-                                    : AppTheme.primaryColor,
-                              ),
-                            ),
-                            // Inner content
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "${currentOrder.packsProduced}/${currentOrder.packsOrdered}",
-                                  style: TextStyle(
-                                    fontSize: 48, // Increased from 36 to 48
-                                    fontWeight: FontWeight.bold,
-                                    color: currentOrder.packsProduced >= currentOrder.packsOrdered
-                                        ? AppTheme.completedColor
-                                        : AppTheme.primaryColor,
-                                  ),
-                                ),
-                                Text(
-                                  "packs",
-                                  style: TextStyle(
-                                    fontSize: 24, // Increased from 18 to 24
-                                    fontWeight: FontWeight.w500, // Added medium weight
-                                    color: currentOrder.packsProduced >= currentOrder.packsOrdered
-                                        ? AppTheme.completedColor
-                                        : AppTheme.primaryColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 8), // Increased from 5 to 8
-                                // Status indicator
-                                if (currentOrder.packsProduced >= currentOrder.packsOrdered)
-                                  const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.check_circle, 
-                                        color: AppTheme.completedColor, 
-                                        size: 20, // Increased from 16 to 20
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        "Target Met",
-                                        style: TextStyle(
-                                          fontSize: 14, // Increased from 12 to 14
-                                          fontWeight: FontWeight.w500, // Added medium weight
-                                          color: AppTheme.completedColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Plus Button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add_circle, 
-                        size: 70, // Increased from 50 to 70
-                        color: AppTheme.completedColor
-                      ),
-                      padding: const EdgeInsets.all(20), // Increased padding from 12 to 20
-                      onPressed: () => _increment(provider),
-                    ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: AppTheme.largeSpacing),
-
-                // Order Details
-                Expanded(
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppTheme.mediumSpacing),
-                      child: ListView(
+                  // Packs Ordered Monitor with Interactive Progress Circle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _detailItem("Store Name", currentOrder.storeName),
-                          _detailItem("Person in Charge", currentOrder.personInCharge),
-                          if (currentOrder.contactNumber.isNotEmpty)
-                            _detailItem("Contact Number", currentOrder.contactNumber),
-                          _detailItem("Order Date", DateFormat('MMM dd, yyyy').format(currentOrder.orderDate)),
-                          if (currentOrder.deliveryDate != null)
-                            _detailItem("Deadline Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
-                          _detailItem("Status", currentOrder.status),
-                          _detailItem("Payment Status", currentOrder.paymentStatus),
-                          if (currentOrder.notes.isNotEmpty)
-                            _detailItem("Notes", currentOrder.notes),
+                          // Animated Minus Button
+                          TweenAnimationBuilder<double>(
+                            duration: const Duration(milliseconds: 200),
+                            tween: Tween<double>(begin: 1.0, end: 1.0),
+                            builder: (context, scale, child) {
+                              return GestureDetector(
+                                onTap: () {
+                                  _provideHapticFeedback();
+                                  _decrement(provider);
+                                },
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  onEnter: (_) => setState(() {}),
+                                  onExit: (_) => setState(() {}),
+                                  child: AnimatedScale(
+                                    scale: scale,
+                                    duration: const Duration(milliseconds: 150),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(20),
+                                      child: const Icon(
+                                        Icons.remove_circle, 
+                                        size: 70,
+                                        color: AppTheme.cancelledColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          // Interactive Progress Circle with Responsive Size and Smooth Animations
+                          GestureDetector(
+                            onTap: () {
+                              _provideHapticFeedback();
+                              _manualInput(provider);
+                            },
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                // Calculate size based on available width
+                                // Ensure it's not too big or too small
+                                final screenWidth = MediaQuery.of(context).size.width;
+                                final size = screenWidth < 600 
+                                    ? screenWidth * 0.7  // 70% of screen width on small screens
+                                    : 350.0;            // Maximum size on larger screens
+                                
+                                return Hero(
+                                  tag: 'progressCircle-${currentOrder.id}',
+                                  child: AnimatedBuilder(
+                                    animation: _pulseAnimation,
+                                    builder: (context, child) {
+                                      // Only apply pulse effect if the target is met or nearly met (>=90%)
+                                      final shouldPulse = currentOrder.packsProduced >= currentOrder.packsOrdered || 
+                                                        (currentOrder.packsOrdered > 0 && 
+                                                         currentOrder.packsProduced / currentOrder.packsOrdered >= 0.9);
+                                      
+                                      final scale = shouldPulse ? _pulseAnimation.value : 1.0;
+                                      
+                                      return Transform.scale(
+                                        scale: scale,
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 500),
+                                          curve: Curves.easeInOut,
+                                          width: size,
+                                          height: size,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              // Add a glow effect when the target is met
+                                              if (currentOrder.packsProduced >= currentOrder.packsOrdered)
+                                                BoxShadow(
+                                                  color: AppTheme.completedColor.withOpacity(0.5),
+                                                  blurRadius: 20,
+                                                  spreadRadius: 8,
+                                                  // Animated glow effect
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                            ],
+                                          ),
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              // Progress Circle with Animated Progress
+                                              TweenAnimationBuilder<double>(
+                                                duration: const Duration(milliseconds: 750),
+                                                curve: Curves.easeInOut,
+                                                tween: Tween<double>(
+                                                  begin: 0,
+                                                  end: currentOrder.packsOrdered > 0 
+                                                      ? (currentOrder.packsProduced / currentOrder.packsOrdered).clamp(0.0, 1.0) 
+                                                      : 1.0,
+                                                ),
+                                                builder: (context, value, _) => SizedBox(
+                                                  width: size,
+                                                  height: size,
+                                                  child: CircularProgressIndicator(
+                                                    value: value,
+                                                    strokeWidth: size * 0.06, // Proportional stroke width (6% of circle size)
+                                                    backgroundColor: Colors.grey.shade200,
+                                                    color: currentOrder.packsProduced >= currentOrder.packsOrdered 
+                                                        ? AppTheme.completedColor 
+                                                        : AppTheme.primaryColor,
+                                                  ),
+                                                ),
+                                              ),
+                                              
+                                              // Inner content with animations
+                                              AnimatedSwitcher(
+                                                duration: const Duration(milliseconds: 300),
+                                                child: Column(
+                                                  key: ValueKey('${currentOrder.packsProduced}-${currentOrder.packsOrdered}'),
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    // Counter text with animated size
+                                                    TweenAnimationBuilder<double>(
+                                                      duration: const Duration(milliseconds: 400),
+                                                      curve: Curves.easeOutCubic,
+                                                      tween: Tween<double>(begin: 0.8, end: 1.0),
+                                                      builder: (context, scale, child) => Transform.scale(
+                                                        scale: scale,
+                                                        child: Text(
+                                                          "${currentOrder.packsProduced}/${currentOrder.packsOrdered}",
+                                                          style: TextStyle(
+                                                            fontSize: size * 0.16, // Proportional font size
+                                                            fontWeight: FontWeight.bold,
+                                                            color: currentOrder.packsProduced >= currentOrder.packsOrdered
+                                                                ? AppTheme.completedColor
+                                                                : AppTheme.primaryColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    
+                                                    AnimatedDefaultTextStyle(
+                                                      duration: const Duration(milliseconds: 300),
+                                                      style: TextStyle(
+                                                        fontSize: size * 0.08, // Proportional font size
+                                                        fontWeight: FontWeight.w500,
+                                                        color: currentOrder.packsProduced >= currentOrder.packsOrdered
+                                                            ? AppTheme.completedColor
+                                                            : AppTheme.primaryColor,
+                                                      ),
+                                                      child: const Text("packs"),
+                                                    ),
+                                                    
+                                                    SizedBox(height: size * 0.03),
+                                                    
+                                                    // Status indicator with animation
+                                                    if (currentOrder.packsProduced >= currentOrder.packsOrdered)
+                                                      AnimatedOpacity(
+                                                        opacity: 1.0,
+                                                        duration: const Duration(milliseconds: 500),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.check_circle, 
+                                                              color: AppTheme.completedColor, 
+                                                              size: size * 0.07,
+                                                            ),
+                                                            SizedBox(width: size * 0.015),
+                                                            Text(
+                                                              "Target Met",
+                                                              style: TextStyle(
+                                                                fontSize: size * 0.05,
+                                                                fontWeight: FontWeight.w500,
+                                                                color: AppTheme.completedColor,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                          // Animated Plus Button
+                          TweenAnimationBuilder<double>(
+                            duration: const Duration(milliseconds: 200),
+                            tween: Tween<double>(begin: 1.0, end: 1.0),
+                            builder: (context, scale, child) {
+                              return GestureDetector(
+                                onTap: () {
+                                  _provideHapticFeedback();
+                                  _increment(provider);
+                                },
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  onEnter: (_) => setState(() {}),
+                                  onExit: (_) => setState(() {}),
+                                  child: AnimatedScale(
+                                    scale: scale,
+                                    duration: const Duration(milliseconds: 150),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(20),
+                                      child: const Icon(
+                                        Icons.add_circle, 
+                                        size: 70,
+                                        color: AppTheme.completedColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: AppTheme.largeSpacing),
+
+                  // Order Details
+                  Expanded(
+                    child: Hero(
+                      tag: 'order_card_${currentOrder.id}',
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
+                        ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppTheme.mediumSpacing),
+                        child: ListView(
+                          children: [
+                            _detailItem("Store Name", currentOrder.storeName),
+                            _detailItem("Person in Charge", currentOrder.personInCharge),
+                            if (currentOrder.contactNumber.isNotEmpty)
+                              _detailItem("Contact Number", currentOrder.contactNumber),
+                            _detailItem("Order Date", DateFormat('MMM dd, yyyy').format(currentOrder.orderDate)),
+                            if (currentOrder.deliveryDate != null)
+                              _detailItem("Deadline Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
+                            _detailItem("Status", currentOrder.status),
+                            _detailItem("Payment Status", currentOrder.paymentStatus),
+                            if (currentOrder.notes.isNotEmpty)
+                              _detailItem("Notes", currentOrder.notes),
+                          ],
+                        ),
+                      ),
+                    )),
+                  ),
+                ],
+              ),
+            ),
+            bottomNavigationBar: Container(
+              padding: const EdgeInsets.all(AppTheme.mediumSpacing),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Complete/Cancel Button - Show Cancel if order is complete
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(
+                        currentOrder.packsProduced >= currentOrder.packsOrdered
+                            ? Icons.cancel
+                            : Icons.check_circle
+                      ),
+                      label: Text(
+                        currentOrder.packsProduced >= currentOrder.packsOrdered
+                            ? 'Cancel'
+                            : 'Complete'
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: currentOrder.packsProduced >= currentOrder.packsOrdered
+                            ? AppTheme.cancelledColor
+                            : AppTheme.completedColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      onPressed: () {
+                        if (currentOrder.packsProduced >= currentOrder.packsOrdered) {
+                          _updateOrderStatus(provider, currentOrder, 'Cancelled');
+                        } else {
+                          _updateOrderStatus(provider, currentOrder, 'Completed');
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // Hold/Processing Button - Toggle between hold and processing
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(
+                        currentOrder.status == 'Hold'
+                            ? Icons.play_circle_filled
+                            : Icons.pause_circle_filled
+                      ),
+                      label: Text(
+                        currentOrder.status == 'Hold'
+                            ? 'Processing'
+                            : 'Hold'
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: currentOrder.status == 'Hold'
+                            ? AppTheme.processingColor
+                            : Colors.amber,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      onPressed: () {
+                        if (currentOrder.status == 'Hold') {
+                          _updateOrderStatus(provider, currentOrder, 'Processing');
+                        } else {
+                          _updateOrderStatus(provider, currentOrder, 'Hold');
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // Delete Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.delete),
+                      label: const Text('Delete'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.cancelledColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      onPressed: () => _confirmDelete(provider, currentOrder),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          bottomNavigationBar: Container(
-            padding: const EdgeInsets.all(AppTheme.mediumSpacing),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Complete/Cancel Button - Show Cancel if order is complete
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: Icon(
-                      currentOrder.packsProduced >= currentOrder.packsOrdered
-                          ? Icons.cancel
-                          : Icons.check_circle
-                    ),
-                    label: Text(
-                      currentOrder.packsProduced >= currentOrder.packsOrdered
-                          ? 'Cancel'
-                          : 'Complete'
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: currentOrder.packsProduced >= currentOrder.packsOrdered
-                          ? AppTheme.cancelledColor
-                          : AppTheme.completedColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    onPressed: () {
-                      if (currentOrder.packsProduced >= currentOrder.packsOrdered) {
-                        _updateOrderStatus(provider, currentOrder, 'Cancelled');
-                      } else {
-                        _updateOrderStatus(provider, currentOrder, 'Completed');
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                
-                // Hold/Processing Button - Toggle between hold and processing
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: Icon(
-                      currentOrder.status == 'Hold'
-                          ? Icons.play_circle_filled
-                          : Icons.pause_circle_filled
-                    ),
-                    label: Text(
-                      currentOrder.status == 'Hold'
-                          ? 'Processing'
-                          : 'Hold'
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: currentOrder.status == 'Hold'
-                          ? AppTheme.processingColor
-                          : Colors.amber,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    onPressed: () {
-                      if (currentOrder.status == 'Hold') {
-                        _updateOrderStatus(provider, currentOrder, 'Processing');
-                      } else {
-                        _updateOrderStatus(provider, currentOrder, 'Hold');
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                
-                // Delete Button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.delete),
-                    label: const Text('Delete'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.cancelledColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    onPressed: () => _confirmDelete(provider, currentOrder),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
         );
       },
     );

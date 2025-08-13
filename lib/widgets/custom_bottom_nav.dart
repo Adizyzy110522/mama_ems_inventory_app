@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../config/app_theme.dart';
 
 class CustomBottomNav extends StatelessWidget {
@@ -16,7 +17,10 @@ class CustomBottomNav extends StatelessWidget {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
       currentIndex: currentIndex,
-      onTap: onTap,
+      onTap: (index) {
+        HapticFeedback.selectionClick();
+        onTap(index);
+      },
       selectedItemColor: AppTheme.primaryColor,
       unselectedItemColor: AppTheme.textSecondaryColor,
       backgroundColor: Colors.white,

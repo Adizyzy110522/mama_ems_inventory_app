@@ -7,7 +7,6 @@ import '../providers/product_manager.dart';
 import '../models/order.dart';
 import 'order_details_screen.dart';
 import 'filtered_orders_screen.dart';
-import 'landing_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
