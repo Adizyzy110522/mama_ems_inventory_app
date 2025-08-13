@@ -5,7 +5,9 @@ class Order {
   final String id;
   final String storeName;
   final String personInCharge;
-  final int packsOrdered;
+  final String contactNumber;  // Added contact number field
+  final int packsOrdered;  // Target number of packs needed for this order
+  final int packsProduced;  // Current number of packs produced for this order
   final String status;
   final String paymentStatus;
   final String notes;
@@ -13,15 +15,17 @@ class Order {
   final DateTime? deliveryDate;
   
   // Add validation constants
-  static const List<String> validStatuses = ['Processing', 'Completed', 'Cancelled'];
-  static const List<String> validPaymentStatuses = ['Paid', 'Pending', 'Cancelled'];
+  static const List<String> validStatuses = ['Processing', 'Pending', 'Hold', 'Completed', 'Cancelled'];
+  static const List<String> validPaymentStatuses = ['Paid', 'Pending'];
   static const int maxPacksPerOrder = 1000;
 
   Order({
     required this.id,
     required this.storeName,
     required this.personInCharge,
+    this.contactNumber = '',  // Default to empty string if not provided
     required this.packsOrdered,
+    this.packsProduced = 0,   // Default to 0 if not provided
     required this.status,
     required this.paymentStatus,
     required this.notes,
@@ -33,6 +37,8 @@ class Order {
     assert(storeName.isNotEmpty, 'Store name cannot be empty');
     assert(personInCharge.isNotEmpty, 'Person in charge cannot be empty');
     assert(packsOrdered >= 0, 'Packs ordered must be non-negative');
+    assert(packsProduced >= 0, 'Packs produced must be non-negative');
+    assert(packsProduced <= packsOrdered, 'Packs produced cannot exceed packs ordered');
     assert(validStatuses.contains(status), 'Invalid order status: $status');
     assert(validPaymentStatuses.contains(paymentStatus), 'Invalid payment status: $paymentStatus');
   }
@@ -43,7 +49,9 @@ class Order {
       'id': id,
       'storeName': storeName,
       'personInCharge': personInCharge,
+      'contactNumber': contactNumber,  // Added contact number
       'packsOrdered': packsOrdered,
+      'packsProduced': packsProduced,
       'status': status,
       'paymentStatus': paymentStatus,
       'notes': notes,
@@ -59,7 +67,9 @@ class Order {
         id: map['id'] ?? '',
         storeName: map['storeName'] ?? '',
         personInCharge: map['personInCharge'] ?? '',
+        contactNumber: map['contactNumber'] ?? '',  // Added contact number
         packsOrdered: _parsePacksOrdered(map['packsOrdered']),
+        packsProduced: _parsePacksProduced(map['packsProduced'], map['packsOrdered']),
         status: _validateStatus(map['status']),
         paymentStatus: _validatePaymentStatus(map['paymentStatus']),
         notes: map['notes'] ?? '',
@@ -75,7 +85,9 @@ class Order {
         id: map['id'] ?? 'error_${DateTime.now().millisecondsSinceEpoch}',
         storeName: 'Error Loading Data',
         personInCharge: '',
+        contactNumber: '',  // Added contact number
         packsOrdered: 0,
+        packsProduced: 0,
         status: 'Processing',
         paymentStatus: 'Pending',
         notes: 'There was an error loading this order data: $e',
@@ -95,6 +107,25 @@ class Order {
     try {
       final parsedValue = int.parse(value.toString());
       return parsedValue.clamp(0, maxPacksPerOrder);
+    } catch (e) {
+      return 0;
+    }
+  }
+  
+  static int _parsePacksProduced(dynamic value, dynamic maxValue) {
+    // Default to 0 if null
+    if (value == null) return 0;
+    
+    // Get maximum packs ordered
+    int maxPacks = _parsePacksOrdered(maxValue);
+    
+    if (value is int) {
+      return value.clamp(0, maxPacks);
+    }
+    
+    try {
+      final parsedValue = int.parse(value.toString());
+      return parsedValue.clamp(0, maxPacks);
     } catch (e) {
       return 0;
     }
@@ -131,7 +162,9 @@ class Order {
     String? id,
     String? storeName,
     String? personInCharge,
+    String? contactNumber,  // Added contact number
     int? packsOrdered,
+    int? packsProduced,
     String? status,
     String? paymentStatus,
     String? notes,
@@ -142,7 +175,9 @@ class Order {
       id: id ?? this.id,
       storeName: storeName ?? this.storeName,
       personInCharge: personInCharge ?? this.personInCharge,
+      contactNumber: contactNumber ?? this.contactNumber,  // Added contact number
       packsOrdered: packsOrdered ?? this.packsOrdered,
+      packsProduced: packsProduced ?? this.packsProduced,
       status: status ?? this.status,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       notes: notes ?? this.notes,

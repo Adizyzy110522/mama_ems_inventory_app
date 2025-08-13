@@ -123,18 +123,30 @@ class OrderProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateOrderQuantity(String orderId, int newQuantity) async {
+  Future<void> updatePacksProduced(String orderId, int packsProduced) async {
     try {
       final orderIndex = _orders.indexWhere((order) => order.id == orderId);
       if (orderIndex != -1) {
-        final updatedOrder = _orders[orderIndex].copyWith(
-          packsOrdered: newQuantity,
+        final currentOrder = _orders[orderIndex];
+        // Ensure packsProduced doesn't exceed packsOrdered
+        final validatedPacksProduced = packsProduced > currentOrder.packsOrdered
+            ? currentOrder.packsOrdered
+            : packsProduced;
+            
+        final updatedOrder = currentOrder.copyWith(
+          packsProduced: validatedPacksProduced,
         );
         await updateOrder(updatedOrder);
       }
     } catch (e) {
-      print('Error updating order quantity: $e');
+      print('Error updating produced packs: $e');
     }
+  }
+  
+  // Keep this for backward compatibility - redirects to updatePacksProduced
+  @Deprecated('Use updatePacksProduced instead')
+  Future<void> updateOrderQuantity(String orderId, int newQuantity) async {
+    return updatePacksProduced(orderId, newQuantity);
   }
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {

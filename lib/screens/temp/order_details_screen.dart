@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../models/order.dart';
-import '../providers/order_provider.dart';
-import '../config/app_theme.dart';
+import '../../models/order.dart';
+import '../../providers/order_provider.dart';
+import '../../config/app_theme.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -15,31 +15,34 @@ class OrderDetailsScreen extends StatefulWidget {
 }
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
-  late int packsProduced;
+  late int packsOrdered;
 
   @override
   void initState() {
     super.initState();
-    packsProduced = widget.order.packsProduced;
+    packsOrdered = widget.order.packsOrdered;
   }
 
   Future<void> _updateQuantity(OrderProvider provider) async {
-    if (packsProduced != widget.order.packsProduced) {
+    if (packsOrdered != widget.order.packsOrdered) {
+      // Store context locally before the async gap
+      final currentContext = context;
+      
       try {
         // Validate input before updating
-        if (packsProduced < 0) {
-          throw Exception('Produced packs cannot be negative');
+        if (packsOrdered < 0) {
+          throw Exception('Quantity cannot be negative');
         }
         
-        if (packsProduced > widget.order.packsOrdered) {
-          throw Exception('Produced packs cannot exceed ordered packs (${widget.order.packsOrdered})');
+        if (packsOrdered > Order.maxPacksPerOrder) {
+          throw Exception('Maximum order quantity exceeded (${Order.maxPacksPerOrder})');
         }
         
-        await provider.updatePacksProduced(widget.order.id, packsProduced);
+        await provider.updateOrderQuantity(widget.order.id, packsOrdered);
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Production quantity updated successfully')),
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            const SnackBar(content: Text('Quantity updated successfully')),
           );
         }
       } catch (e) {
@@ -47,10 +50,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         if (mounted) {
           setState(() {
             // Revert to original value on error
-            packsProduced = widget.order.packsProduced;
+            packsOrdered = widget.order.packsOrdered;
           });
           
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(currentContext).showSnackBar(
             SnackBar(
               content: Text('Error updating quantity: ${e.toString()}'),
               backgroundColor: Colors.red,
@@ -63,15 +66,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   void _increment(OrderProvider provider) {
     // Prevent exceeding max value
-    if (packsProduced < widget.order.packsOrdered) {
+    if (packsOrdered < Order.maxPacksPerOrder) {
       setState(() {
-        packsProduced++;
+        packsOrdered++;
       });
       _updateQuantity(provider);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Maximum production quantity (${widget.order.packsOrdered}) reached'),
+          content: Text('Maximum order quantity (${Order.maxPacksPerOrder}) reached'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -79,9 +82,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   void _decrement(OrderProvider provider) {
-    if (packsProduced > 0) {
+    if (packsOrdered > 0) {
       setState(() {
-        packsProduced--;
+        packsOrdered--;
       });
       _updateQuantity(provider);
     } else {
@@ -95,14 +98,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   void _manualInput(OrderProvider provider) async {
-    final controller = TextEditingController(text: packsProduced.toString());
+    final controller = TextEditingController(text: packsOrdered.toString());
     String? errorText;
 
     final result = await showDialog<int>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text("Enter Packs Produced"),
+          title: const Text("Enter Packs Ordered"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -111,9 +114,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: "Enter number of packs produced",
+                  hintText: "Enter number of packs",
                   errorText: errorText,
-                  helperText: "Maximum: ${widget.order.packsOrdered} packs",
+                  helperText: "Maximum: ${Order.maxPacksPerOrder} packs",
                 ),
                 onChanged: (value) {
                   // Live validation
@@ -141,7 +144,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ElevatedButton(
               onPressed: () {
                 final value = int.tryParse(controller.text);
-                if (value != null && value >= 0 && value <= widget.order.packsOrdered) {
+                if (value != null && value >= 0 && value <= Order.maxPacksPerOrder) {
                   Navigator.pop(context, value);
                 } else {
                   // Show error in the dialog
@@ -151,7 +154,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     } else if (value < 0) {
                       errorText = "Quantity cannot be negative";
                     } else {
-                      errorText = "Maximum quantity (${widget.order.packsOrdered}) exceeded";
+                      errorText = "Maximum quantity (${Order.maxPacksPerOrder}) exceeded";
                     }
                   });
                 }
@@ -165,7 +168,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     if (result != null) {
       setState(() {
-        packsProduced = result;
+        packsOrdered = result;
       });
       _updateQuantity(provider);
     }
@@ -173,12 +176,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   
   // Update order status method
   Future<void> _updateOrderStatus(OrderProvider provider, Order order, String newStatus) async {
+    // Store context locally before the async gap
+    final currentContext = context;
+    
     try {
       final updatedOrder = order.copyWith(status: newStatus);
       await provider.updateOrder(updatedOrder);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(currentContext).showSnackBar(
           SnackBar(
             content: Text('Order marked as ${newStatus.toLowerCase()}'),
             backgroundColor: newStatus == 'Completed' 
@@ -191,7 +197,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(currentContext).showSnackBar(
           SnackBar(
             content: Text('Error updating order: ${e.toString()}'),
             backgroundColor: Colors.red,
@@ -218,14 +224,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: AppTheme.cancelledColor,
             ),
             onPressed: () async {
+              // Store context locally before the async gap
+              final currentContext = context;
+              
               try {
                 await provider.deleteOrder(order.id);
                 
                 if (mounted) {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(); // Return to previous screen
+                  // Use the stored context reference
+                  Navigator.of(currentContext).pop(); // Close dialog
+                  Navigator.of(currentContext).pop(); // Return to previous screen
                   
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
                     const SnackBar(
                       content: Text('Order deleted successfully'),
                       backgroundColor: Colors.green,
@@ -233,13 +243,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   );
                 }
               } catch (e) {
-                Navigator.of(context).pop(); // Close dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error deleting order: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (mounted) {
+                  // Use the stored context and check mounted before accessing context after async gap
+                  Navigator.of(currentContext).pop(); // Close dialog
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting order: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
@@ -257,7 +270,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13), // Changed from withOpacity(0.05) to withAlpha(13)
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -269,7 +282,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         children: [
           Icon(
             _getIconForLabel(label),
-            color: AppTheme.primaryColor.withOpacity(0.7),
+            color: AppTheme.primaryColor.withAlpha(179), // Changed from withOpacity(0.7) to withAlpha(179)
             size: 22,
           ),
           const SizedBox(width: 12),
@@ -429,7 +442,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             // Add a glow effect when the target is met
                             if (packsOrdered >= currentOrder.packsOrdered)
                               BoxShadow(
-                                color: AppTheme.completedColor.withOpacity(0.5),
+                                color: AppTheme.completedColor.withAlpha(128), // Changed from withOpacity(0.5) to withAlpha(128)
                                 blurRadius: 15,
                                 spreadRadius: 5,
                               ),
@@ -444,11 +457,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               height: 150,
                               child: CircularProgressIndicator(
                                 value: currentOrder.packsOrdered > 0 
-                                    ? (currentOrder.packsProduced / currentOrder.packsOrdered).clamp(0.0, 1.0) 
+                                    ? (packsOrdered / currentOrder.packsOrdered).clamp(0.0, 1.0) 
                                     : 1.0,
                                 strokeWidth: 10,
                                 backgroundColor: Colors.grey.shade200,
-                                color: currentOrder.packsProduced >= currentOrder.packsOrdered 
+                                color: packsOrdered >= currentOrder.packsOrdered 
                                     ? AppTheme.completedColor 
                                     : AppTheme.primaryColor,
                               ),
@@ -458,11 +471,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  "${currentOrder.packsProduced}/${currentOrder.packsOrdered}",
+                                  "$packsOrdered/${currentOrder.packsOrdered}",
                                   style: TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.bold,
-                                    color: currentOrder.packsProduced >= currentOrder.packsOrdered
+                                    color: packsOrdered >= currentOrder.packsOrdered
                                         ? AppTheme.completedColor
                                         : AppTheme.primaryColor,
                                   ),
@@ -532,8 +545,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           _detailItem("Person in Charge", currentOrder.personInCharge),
                           if (currentOrder.contactNumber.isNotEmpty)
                             _detailItem("Contact Number", currentOrder.contactNumber),
-                          if (currentOrder.deliveryDate != null)
-                            _detailItem("Delivery Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
                           _detailItem("Order Date", DateFormat('MMM dd, yyyy').format(currentOrder.orderDate)),
                           if (currentOrder.deliveryDate != null)
                             _detailItem("Delivery Date", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate!)),
@@ -555,7 +566,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withAlpha(26), // Changed from withOpacity(0.1) to withAlpha(26)
                   blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),

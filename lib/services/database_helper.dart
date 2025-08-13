@@ -59,7 +59,7 @@ class DatabaseHelper {
       
       return await openDatabase(
         path,
-        version: 1,
+        version: 3, // Upgraded from version 2 to 3 to add packsProduced field
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -76,7 +76,9 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         storeName TEXT NOT NULL,
         personInCharge TEXT NOT NULL,
+        contactNumber TEXT, 
         packsOrdered INTEGER NOT NULL,
+        packsProduced INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL,
         paymentStatus TEXT NOT NULL,
         notes TEXT,
@@ -96,8 +98,25 @@ class DatabaseHelper {
     debugPrint('Upgrading database from version $oldVersion to $newVersion');
     
     // Add migration logic here as the app evolves
-    // Example:
-    // if (oldVersion < 2) {
+    if (oldVersion < 2) {
+      // Add contactNumber column to the orders table
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN contactNumber TEXT;');
+        debugPrint('Successfully added contactNumber column to orders table');
+      } catch (e) {
+        debugPrint('Error adding contactNumber column: $e');
+      }
+    }
+    
+    if (oldVersion < 3) {
+      // Add packsProduced column to the orders table
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN packsProduced INTEGER NOT NULL DEFAULT 0;');
+        debugPrint('Successfully added packsProduced column to orders table');
+      } catch (e) {
+        debugPrint('Error adding packsProduced column: $e');
+      }
+    }
     //   await db.execute('ALTER TABLE orders ADD COLUMN priority TEXT');
     // }
   }
@@ -109,6 +128,7 @@ class DatabaseHelper {
         'storeName': 'FreshMart Grocery',
         'personInCharge': 'Anna Lopez',
         'packsOrdered': 25,
+        'packsProduced': 15,
         'status': 'Processing',
         'paymentStatus': 'Paid',
         'notes': 'Deliver before Friday morning',
@@ -120,6 +140,7 @@ class DatabaseHelper {
         'storeName': 'City Deli',
         'personInCharge': 'Mark Santos',
         'packsOrdered': 40,
+        'packsProduced': 20,
         'status': 'Processing',
         'paymentStatus': 'Pending',
         'notes': 'Urgent order',
@@ -131,6 +152,7 @@ class DatabaseHelper {
         'storeName': 'Banana King',
         'personInCharge': 'Carla Reyes',
         'packsOrdered': 12,
+        'packsProduced': 12,
         'status': 'Processing',
         'paymentStatus': 'Paid',
         'notes': 'No rush delivery',
@@ -142,6 +164,7 @@ class DatabaseHelper {
         'storeName': 'GreenLeaf Market',
         'personInCharge': 'Joey Fernandez',
         'packsOrdered': 30,
+        'packsProduced': 0,
         'status': 'Processing',
         'paymentStatus': 'Paid',
         'notes': 'Fragile packaging',
