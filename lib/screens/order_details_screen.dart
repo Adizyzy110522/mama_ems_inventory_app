@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/order_provider.dart';
 import '../config/app_theme.dart';
-import '../config/animations.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
