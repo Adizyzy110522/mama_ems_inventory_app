@@ -1,5 +1,6 @@
 // lib/models/order.dart
 import 'package:flutter/foundation.dart';
+import '../config/product_config.dart';
 
 class Order {
   final String id;
@@ -13,6 +14,12 @@ class Order {
   final String notes;
   final DateTime orderDate;
   final DateTime? deliveryDate;
+  
+  // New fields for packaging and pricing
+  final String packType; // Stand Pouch or Square Pack
+  final String priceType; // Wholesale or Retail
+  final double unitPrice; // Price per pack
+  final double totalPrice; // Total price (packsOrdered * unitPrice)
   
   // Add validation constants
   static const List<String> validStatuses = ['Processing', 'Pending', 'Hold', 'Completed', 'Cancelled'];
@@ -31,6 +38,10 @@ class Order {
     required this.notes,
     required this.orderDate,
     this.deliveryDate,
+    required this.packType,
+    required this.priceType,
+    required this.unitPrice,
+    required this.totalPrice,
   }) {
     // Validate values in debug mode only to avoid runtime crashes in production
     assert(id.isNotEmpty, 'Order ID cannot be empty');
@@ -41,6 +52,10 @@ class Order {
     assert(packsProduced <= packsOrdered, 'Packs produced cannot exceed packs ordered');
     assert(validStatuses.contains(status), 'Invalid order status: $status');
     assert(validPaymentStatuses.contains(paymentStatus), 'Invalid payment status: $paymentStatus');
+    assert(packType.isNotEmpty, 'Pack type cannot be empty');
+    assert(priceType.isNotEmpty, 'Price type cannot be empty');
+    assert(unitPrice >= 0, 'Unit price must be non-negative');
+    assert(totalPrice >= 0, 'Total price must be non-negative');
   }
 
   // Convert to Map for database storage
@@ -57,6 +72,10 @@ class Order {
       'notes': notes,
       'orderDate': orderDate.toIso8601String(),
       'deliveryDate': deliveryDate?.toIso8601String(),
+      'packType': packType,
+      'priceType': priceType,
+      'unitPrice': unitPrice,
+      'totalPrice': totalPrice,
     };
   }
 
@@ -67,7 +86,7 @@ class Order {
         id: map['id'] ?? '',
         storeName: map['storeName'] ?? '',
         personInCharge: map['personInCharge'] ?? '',
-        contactNumber: map['contactNumber'] ?? '',  // Added contact number
+        contactNumber: map['contactNumber'] ?? '',
         packsOrdered: _parsePacksOrdered(map['packsOrdered']),
         packsProduced: _parsePacksProduced(map['packsProduced'], map['packsOrdered']),
         status: _validateStatus(map['status']),
@@ -77,6 +96,10 @@ class Order {
         deliveryDate: map['deliveryDate'] != null 
             ? _parseDateTime(map['deliveryDate'], null) 
             : null,
+        packType: map['packType'] ?? ProductConfig.standPouch,
+        priceType: map['priceType'] ?? ProductConfig.wholesale,
+        unitPrice: _parseDouble(map['unitPrice'], 0.0),
+        totalPrice: _parseDouble(map['totalPrice'], 0.0),
       );
     } catch (e) {
       debugPrint('Error parsing order: $e');
@@ -85,13 +108,17 @@ class Order {
         id: map['id'] ?? 'error_${DateTime.now().millisecondsSinceEpoch}',
         storeName: 'Error Loading Data',
         personInCharge: '',
-        contactNumber: '',  // Added contact number
+        contactNumber: '',
         packsOrdered: 0,
         packsProduced: 0,
         status: 'Processing',
         paymentStatus: 'Pending',
         notes: 'There was an error loading this order data: $e',
         orderDate: DateTime.now(),
+        packType: ProductConfig.standPouch,
+        priceType: ProductConfig.wholesale,
+        unitPrice: 0.0,
+        totalPrice: 0.0,
       );
     }
   }
@@ -109,6 +136,24 @@ class Order {
       return parsedValue.clamp(0, maxPacksPerOrder);
     } catch (e) {
       return 0;
+    }
+  }
+  
+  static double _parseDouble(dynamic value, double defaultValue) {
+    if (value == null) return defaultValue;
+    
+    if (value is double) {
+      return value;
+    }
+    
+    if (value is int) {
+      return value.toDouble();
+    }
+    
+    try {
+      return double.parse(value.toString());
+    } catch (e) {
+      return defaultValue;
     }
   }
   
@@ -162,7 +207,7 @@ class Order {
     String? id,
     String? storeName,
     String? personInCharge,
-    String? contactNumber,  // Added contact number
+    String? contactNumber,
     int? packsOrdered,
     int? packsProduced,
     String? status,
@@ -170,12 +215,16 @@ class Order {
     String? notes,
     DateTime? orderDate,
     DateTime? deliveryDate,
+    String? packType,
+    String? priceType,
+    double? unitPrice,
+    double? totalPrice,
   }) {
     return Order(
       id: id ?? this.id,
       storeName: storeName ?? this.storeName,
       personInCharge: personInCharge ?? this.personInCharge,
-      contactNumber: contactNumber ?? this.contactNumber,  // Added contact number
+      contactNumber: contactNumber ?? this.contactNumber,
       packsOrdered: packsOrdered ?? this.packsOrdered,
       packsProduced: packsProduced ?? this.packsProduced,
       status: status ?? this.status,
@@ -183,6 +232,10 @@ class Order {
       notes: notes ?? this.notes,
       orderDate: orderDate ?? this.orderDate,
       deliveryDate: deliveryDate ?? this.deliveryDate,
+      packType: packType ?? this.packType,
+      priceType: priceType ?? this.priceType,
+      unitPrice: unitPrice ?? this.unitPrice,
+      totalPrice: totalPrice ?? this.totalPrice,
     );
   }
 }

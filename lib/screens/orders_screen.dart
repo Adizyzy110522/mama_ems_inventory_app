@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../config/app_theme.dart';
 import '../config/animations.dart';
+import '../config/product_config.dart';
 import '../providers/order_provider.dart';
 import '../models/order.dart';
 import 'order_details_screen.dart';
@@ -44,8 +45,10 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Load all orders when returning to this screen
-    _refreshOrders();
+    // Load all orders when returning to this screen - using post frame callback to avoid build phase issues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshOrders();
+    });
   }
   
   @override
@@ -380,7 +383,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${order.packsOrdered} packs',
+                  '${order.packsOrdered} ${order.packType}',
                   style: const TextStyle(
                     color: AppTheme.textSecondaryColor,
                   ),
@@ -396,6 +399,37 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                   dateFormat.format(order.orderDate),
                   style: const TextStyle(
                     color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.monetization_on,
+                  size: 16,
+                  color: AppTheme.textSecondaryColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${order.priceType} · ₱${order.unitPrice.toStringAsFixed(2)}/pack',
+                  style: const TextStyle(
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.paid,
+                  size: 16,
+                  color: AppTheme.textSecondaryColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '₱${order.totalPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: AppTheme.textSecondaryColor,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -452,6 +486,10 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
     String status = 'Processing';
     String? paymentStatus; // Set to null initially for default prompt
     DateTime? deadline; // Order deadline date
+    String packType = ProductConfig.standPouch; // Default pack type
+    String priceType = ProductConfig.wholesale; // Default price type
+    double unitPrice = 70.0; // Default unit price
+    double totalPrice = 70.0; // Default total price (will be updated based on quantity)
     
     // Get theme for consistent styling
     final theme = Theme.of(context);
@@ -570,6 +608,103 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                             labelText: 'Packs Ordered',
                             border: const OutlineInputBorder(),
                             prefixIcon: Icon(Icons.inventory, color: theme.primaryColor),
+                          ),
+                          onChanged: (value) {
+                            // Update total price when quantity changes
+                            try {
+                              int packs = int.parse(value);
+                              setState(() {
+                                totalPrice = unitPrice * packs;
+                              });
+                            } catch (e) {
+                              // Handle invalid input
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Pack Type dropdown
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: 'Packaging Type',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.inventory_2, color: theme.primaryColor),
+                          ),
+                          value: packType,
+                          onChanged: (newValue) {
+                            setState(() {
+                              packType = newValue!;
+                              // Update unit price based on pack type and price type
+                              if (packType == ProductConfig.standPouch) {
+                                unitPrice = priceType == ProductConfig.wholesale ? 70.0 : 100.0;
+                              } else {
+                                unitPrice = priceType == ProductConfig.wholesale ? 20.0 : 35.0;
+                              }
+                              // Update total price
+                              try {
+                                int packs = int.parse(packsController.text);
+                                totalPrice = unitPrice * packs;
+                              } catch (e) {
+                                totalPrice = unitPrice;
+                              }
+                            });
+                          },
+                          items: [ProductConfig.standPouch, ProductConfig.squarePack]
+                              .map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        // Price Type dropdown
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: 'Price Type',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.price_change, color: theme.primaryColor),
+                          ),
+                          value: priceType,
+                          onChanged: (newValue) {
+                            setState(() {
+                              priceType = newValue!;
+                              // Update unit price based on pack type and price type
+                              if (packType == ProductConfig.standPouch) {
+                                unitPrice = priceType == ProductConfig.wholesale ? 70.0 : 100.0;
+                              } else {
+                                unitPrice = priceType == ProductConfig.wholesale ? 20.0 : 35.0;
+                              }
+                              // Update total price
+                              try {
+                                int packs = int.parse(packsController.text);
+                                totalPrice = unitPrice * packs;
+                              } catch (e) {
+                                totalPrice = unitPrice;
+                              }
+                            });
+                          },
+                          items: [ProductConfig.wholesale, ProductConfig.retail]
+                              .map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        // Price Summary (Read-only)
+                        InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Price Summary',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.monetization_on, color: theme.primaryColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Unit Price: ₱${unitPrice.toStringAsFixed(2)}'),
+                              Text('Total Price: ₱${totalPrice.toStringAsFixed(2)}'),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -772,6 +907,10 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                                   notes: notesController.text,
                                   orderDate: DateTime.now(),
                                   deliveryDate: deadline, // Use the selected deadline date
+                                  packType: packType, // Use selected pack type
+                                  priceType: priceType, // Use selected price type
+                                  unitPrice: unitPrice, // Use calculated unit price
+                                  totalPrice: totalPrice, // Use calculated total price
                                 );
             
                                 Provider.of<OrderProvider>(context, listen: false)

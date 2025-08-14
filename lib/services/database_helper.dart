@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/order.dart';
+import '../config/product_config.dart';
 
 class DatabaseHelper {
   // Static cache of database helpers per product category
@@ -68,11 +69,21 @@ class DatabaseHelper {
         // For native platforms, use the file system
         path = join(await getDatabasesPath(), 'orders_$productCategory.db');
         debugPrint('Using native database path for $productCategory: $path');
+        
+        // During development, force recreate the database to apply schema changes
+        if (kDebugMode) {
+          try {
+            await deleteDatabase(path);
+            debugPrint('Deleted old database for $productCategory to force schema update');
+          } catch (e) {
+            debugPrint('Error deleting database: $e');
+          }
+        }
       }
       
       return await openDatabase(
         path,
-        version: 3, // Upgraded from version 2 to 3 to add packsProduced field
+        version: 4, // Upgraded to version 4 to add packaging and pricing fields
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -96,7 +107,11 @@ class DatabaseHelper {
         paymentStatus TEXT NOT NULL,
         notes TEXT,
         orderDate TEXT NOT NULL,
-        deliveryDate TEXT
+        deliveryDate TEXT,
+        packType TEXT NOT NULL DEFAULT 'Stand Pouch',
+        priceType TEXT NOT NULL DEFAULT 'Wholesale',
+        unitPrice REAL NOT NULL DEFAULT 0.0,
+        totalPrice REAL NOT NULL DEFAULT 0.0
       )
     ''');
 
@@ -130,6 +145,20 @@ class DatabaseHelper {
         debugPrint('Error adding packsProduced column: $e');
       }
     }
+    
+    if (oldVersion < 4) {
+      // Add new packaging and pricing columns
+      try {
+        // SQLite has limited ALTER TABLE support, so we add one column at a time
+        await db.execute('ALTER TABLE orders ADD COLUMN packType TEXT NOT NULL DEFAULT \'Stand Pouch\';');
+        await db.execute('ALTER TABLE orders ADD COLUMN priceType TEXT NOT NULL DEFAULT \'Wholesale\';');
+        await db.execute('ALTER TABLE orders ADD COLUMN unitPrice REAL NOT NULL DEFAULT 0.0;');
+        await db.execute('ALTER TABLE orders ADD COLUMN totalPrice REAL NOT NULL DEFAULT 0.0;');
+        debugPrint('Successfully added packaging and pricing columns to orders table');
+      } catch (e) {
+        debugPrint('Error adding packaging and pricing columns: $e');
+      }
+    }
     //   await db.execute('ALTER TABLE orders ADD COLUMN priority TEXT');
     // }
   }
@@ -152,6 +181,10 @@ class DatabaseHelper {
             'notes': 'Deliver banana chips before Friday morning',
             'orderDate': DateTime.now().toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Wholesale',
+            'unitPrice': 70.0,
+            'totalPrice': 1750.0,
           },
           {
             'id': 'banana_002',
@@ -164,6 +197,10 @@ class DatabaseHelper {
             'notes': 'Urgent banana chips order - on hold',
             'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Square Pack',
+            'priceType': 'Retail',
+            'unitPrice': 35.0,
+            'totalPrice': 1400.0,
           },
           {
             'id': 'banana_003',
@@ -176,6 +213,10 @@ class DatabaseHelper {
             'notes': 'No rush banana chips delivery',
             'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Retail',
+            'unitPrice': 100.0,
+            'totalPrice': 1200.0,
           },
           {
             'id': 'banana_004',
@@ -188,6 +229,10 @@ class DatabaseHelper {
             'notes': 'Fragile banana chips packaging',
             'orderDate': DateTime.now().subtract(Duration(days: 3)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Square Pack',
+            'priceType': 'Wholesale',
+            'unitPrice': 20.0,
+            'totalPrice': 600.0,
           },
         ];
         break;
@@ -205,6 +250,10 @@ class DatabaseHelper {
             'notes': 'Regular karlang chips customer',
             'orderDate': DateTime.now().toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Wholesale',
+            'unitPrice': 70.0,
+            'totalPrice': 1400.0,
           },
           {
             'id': 'karlang_002',
@@ -217,6 +266,10 @@ class DatabaseHelper {
             'notes': 'Karlang chips special packaging',
             'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Square Pack',
+            'priceType': 'Retail',
+            'unitPrice': 35.0,
+            'totalPrice': 525.0,
           },
           {
             'id': 'karlang_003',
@@ -229,6 +282,10 @@ class DatabaseHelper {
             'notes': 'Big karlang chips order for event - on hold',
             'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Wholesale',
+            'unitPrice': 70.0,
+            'totalPrice': 2450.0,
           },
         ];
         break;
@@ -246,6 +303,10 @@ class DatabaseHelper {
             'notes': 'Kamote chips for weekend market',
             'orderDate': DateTime.now().toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Square Pack',
+            'priceType': 'Wholesale',
+            'unitPrice': 20.0,
+            'totalPrice': 360.0,
           },
           {
             'id': 'kamote_002',
@@ -258,6 +319,10 @@ class DatabaseHelper {
             'notes': 'Regular kamote chips order',
             'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Retail',
+            'unitPrice': 100.0,
+            'totalPrice': 2500.0,
           },
           {
             'id': 'kamote_003',
@@ -270,6 +335,10 @@ class DatabaseHelper {
             'notes': 'Monthly kamote chips supply',
             'orderDate': DateTime.now().subtract(Duration(days: 3)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Wholesale',
+            'unitPrice': 70.0,
+            'totalPrice': 2800.0,
           },
           {
             'id': 'kamote_004',
@@ -282,6 +351,10 @@ class DatabaseHelper {
             'notes': 'Small kamote chips batch',
             'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Square Pack',
+            'priceType': 'Retail',
+            'unitPrice': 35.0,
+            'totalPrice': 350.0,
           },
         ];
         break;
@@ -300,6 +373,10 @@ class DatabaseHelper {
             'notes': 'Sample order',
             'orderDate': DateTime.now().toIso8601String(),
             'deliveryDate': null,
+            'packType': 'Stand Pouch',
+            'priceType': 'Wholesale',
+            'unitPrice': 70.0,
+            'totalPrice': 700.0,
           },
         ];
     }
@@ -336,10 +413,14 @@ class DatabaseHelper {
             storeName: 'Error Loading Order',
             personInCharge: '',
             packsOrdered: 0,
-            status: 'Error',
-            paymentStatus: 'Unknown',
+            status: 'Processing', // Use a valid status
+            paymentStatus: 'Pending', // Use a valid payment status
             notes: 'There was an error loading this order: $e',
             orderDate: DateTime.now(),
+            packType: ProductConfig.standPouch,
+            priceType: ProductConfig.wholesale,
+            unitPrice: 0.0,
+            totalPrice: 0.0,
           );
         }
       });
@@ -415,9 +496,13 @@ class DatabaseHelper {
             personInCharge: '',
             packsOrdered: 0,
             status: status,
-            paymentStatus: 'Unknown',
+            paymentStatus: 'Pending',
             notes: 'There was an error loading this order: $e',
             orderDate: DateTime.now(),
+            packType: ProductConfig.standPouch,
+            priceType: ProductConfig.wholesale,
+            unitPrice: 0.0,
+            totalPrice: 0.0,
           );
         }
       });
@@ -451,10 +536,14 @@ class DatabaseHelper {
             storeName: 'Error Loading Order',
             personInCharge: '',
             packsOrdered: 0,
-            status: 'Unknown',
+            status: 'Processing',
             paymentStatus: paymentStatus,
             notes: 'There was an error loading this order: $e',
             orderDate: DateTime.now(),
+            packType: ProductConfig.standPouch,
+            priceType: ProductConfig.wholesale,
+            unitPrice: 0.0,
+            totalPrice: 0.0,
           );
         }
       });
