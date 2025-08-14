@@ -277,10 +277,32 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: AppTheme.smallSpacing),
             Expanded(
               child: _statisticsCard(
+                icon: Icons.pause_circle_filled,
+                title: 'Hold',
+                value: stats['hold'] ?? 0,
+                color: AppTheme.holdColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.smallSpacing),
+        Row(
+          children: [
+            Expanded(
+              child: _statisticsCard(
                 icon: Icons.payments,
                 title: 'Paid',
                 value: stats['paid'] ?? 0,
                 color: AppTheme.paidColor,
+              ),
+            ),
+            const SizedBox(width: AppTheme.smallSpacing),
+            Expanded(
+              child: _statisticsCard(
+                icon: Icons.money_off,
+                title: 'Unpaid',
+                value: stats['unpaid'] ?? 0,
+                color: AppTheme.unpaidColor,
               ),
             ),
           ],
@@ -299,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: InkWell(
         onTap: () {
           // Navigate to Orders screen with filter
-          final status = title == 'Paid' ? 'payment:$title' : title;
+          final status = (title == 'Paid' || title == 'Unpaid') ? 'payment:$title' : title;
           Navigator.push(
             context,
             MaterialPageRoute(

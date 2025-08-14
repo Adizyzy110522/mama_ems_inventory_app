@@ -159,9 +159,9 @@ class DatabaseHelper {
             'personInCharge': 'Mark Santos',
             'packsOrdered': 40,
             'packsProduced': 20,
-            'status': 'Processing',
+            'status': 'Hold',
             'paymentStatus': 'Pending',
-            'notes': 'Urgent banana chips order',
+            'notes': 'Urgent banana chips order - on hold',
             'orderDate': DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
             'deliveryDate': null,
           },
@@ -224,9 +224,9 @@ class DatabaseHelper {
             'personInCharge': 'Ramon Diaz',
             'packsOrdered': 35,
             'packsProduced': 0,
-            'status': 'Pending',
+            'status': 'Hold',
             'paymentStatus': 'Pending',
-            'notes': 'Big karlang chips order for event',
+            'notes': 'Big karlang chips order for event - on hold',
             'orderDate': DateTime.now().subtract(Duration(days: 2)).toIso8601String(),
             'deliveryDate': null,
           },
@@ -429,11 +429,17 @@ class DatabaseHelper {
   
   Future<List<Order>> getOrdersByPaymentStatus(String paymentStatus) async {
     try {
-      final maps = await safeQuery(
-        'orders',
-        where: 'paymentStatus = ?',
-        whereArgs: [paymentStatus],
-      );
+      final maps = paymentStatus == 'Unpaid' 
+        ? await safeQuery(
+            'orders',
+            where: 'paymentStatus != ?',
+            whereArgs: ['Paid'],
+          )
+        : await safeQuery(
+            'orders',
+            where: 'paymentStatus = ?',
+            whereArgs: [paymentStatus],
+          );
 
       return List.generate(maps.length, (i) {
         try {
@@ -476,8 +482,16 @@ class DatabaseHelper {
           'SELECT COUNT(*) as count FROM orders WHERE status = ?',
           ['Processing']
         );
+        final hold = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE status = ?',
+          ['Hold']
+        );
         final paid = await txn.rawQuery(
           'SELECT COUNT(*) as count FROM orders WHERE paymentStatus = ?',
+          ['Paid']
+        );
+        final unpaid = await txn.rawQuery(
+          'SELECT COUNT(*) as count FROM orders WHERE paymentStatus != ?',
           ['Paid']
         );
 
@@ -485,7 +499,9 @@ class DatabaseHelper {
           'completed': completed.isNotEmpty ? (completed.first['count'] as int? ?? 0) : 0,
           'cancelled': cancelled.isNotEmpty ? (cancelled.first['count'] as int? ?? 0) : 0,
           'pending': pending.isNotEmpty ? (pending.first['count'] as int? ?? 0) : 0,
+          'hold': hold.isNotEmpty ? (hold.first['count'] as int? ?? 0) : 0,
           'paid': paid.isNotEmpty ? (paid.first['count'] as int? ?? 0) : 0,
+          'unpaid': unpaid.isNotEmpty ? (unpaid.first['count'] as int? ?? 0) : 0,
         };
       });
     } catch (e) {
@@ -495,7 +511,9 @@ class DatabaseHelper {
         'completed': 0,
         'cancelled': 0,
         'pending': 0,
+        'hold': 0,
         'paid': 0,
+        'unpaid': 0,
       };
     }
   }

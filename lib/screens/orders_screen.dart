@@ -16,11 +16,37 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClientMixin {
   String? _searchQuery;
   List<Order>? _searchResults;
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
+  
+  @override
+  bool get wantKeepAlive => false; // Don't keep state alive when switching tabs
+  
+  @override
+  void initState() {
+    super.initState();
+    // Ensure we load all orders when this screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshOrders();
+    });
+  }
+  
+  void _refreshOrders() {
+    // Only refresh if not already loading and no active search
+    if (!_isSearching && _searchQuery == null) {
+      Provider.of<OrderProvider>(context, listen: false).loadOrders(refresh: true);
+    }
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load all orders when returning to this screen
+    _refreshOrders();
+  }
   
   @override
   void dispose() {
@@ -52,6 +78,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       appBar: AppBar(
         title: _isSearching 

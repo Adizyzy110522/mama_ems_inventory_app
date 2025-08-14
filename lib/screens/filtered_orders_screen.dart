@@ -47,11 +47,21 @@ class _FilteredOrdersScreenState extends State<FilteredOrdersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Clear filter when going back
+            Provider.of<OrderProvider>(context, listen: false)
+                .loadOrders(refresh: true);
+            Navigator.pop(context);
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_alt_off),
             tooltip: 'Clear Filter',
             onPressed: () {
+              // Clear filter and reload all orders
               Provider.of<OrderProvider>(context, listen: false)
                   .loadOrders(refresh: true);
               Navigator.pop(context);

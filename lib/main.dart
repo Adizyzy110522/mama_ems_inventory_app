@@ -246,7 +246,15 @@ class _MainPageState extends State<MainPage> {
     SettingsScreen(),
   ];
 
+  // This method is called when a tab is selected from the bottom navigation
   void _onTabSelected(int index) {
+    // If switching to Orders tab (index 1), always reload all orders
+    if (index == 1) {
+      final provider = Provider.of<OrderProvider>(context, listen: false);
+      // Reset any filtered orders and load all orders
+      provider.loadOrders(refresh: true);
+    }
+    
     setState(() {
       _currentIndex = index;
     });

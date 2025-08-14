@@ -14,7 +14,9 @@ class AppTheme {
   static const Color completedColor = Color(0xFF4CAF50); // Green
   static const Color cancelledColor = Color(0xFFF44336); // Red
   static const Color processingColor = Color(0xFFFF9800); // Orange
+  static const Color holdColor = Color(0xFF9C27B0); // Purple
   static const Color paidColor = Color(0xFF4CAF50); // Green
+  static const Color unpaidColor = Color(0xFFFFEB3B); // Yellow
   static const Color pendingPaymentColor = Color(0xFFFFEB3B); // Yellow
   
   // Text colors
@@ -48,6 +50,8 @@ class AppTheme {
         return completedColor;
       case 'cancelled':
         return cancelledColor;
+      case 'hold':
+        return holdColor;
       case 'processing':
       default:
         return processingColor;
@@ -59,6 +63,8 @@ class AppTheme {
     switch (paymentStatus.toLowerCase()) {
       case 'paid':
         return paidColor;
+      case 'unpaid':
+        return unpaidColor;
       case 'pending':
         return pendingPaymentColor;
       case 'cancelled':

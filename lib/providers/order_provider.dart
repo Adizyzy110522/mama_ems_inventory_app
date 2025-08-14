@@ -13,7 +13,9 @@ class OrderProvider with ChangeNotifier {
     'completed': 0,
     'cancelled': 0,
     'pending': 0,
+    'hold': 0,
     'paid': 0,
+    'unpaid': 0,
   };
   
   bool _isLoading = false;
@@ -41,7 +43,9 @@ class OrderProvider with ChangeNotifier {
         'completed': 0,
         'cancelled': 0,
         'pending': 0,
+        'hold': 0,
         'paid': 0,
+        'unpaid': 0,
       }; // Reset statistics
       loadOrders(refresh: true);
     }
