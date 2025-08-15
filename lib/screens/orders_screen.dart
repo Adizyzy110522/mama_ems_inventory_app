@@ -481,7 +481,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
     final TextEditingController storeNameController = TextEditingController();
     final TextEditingController personController = TextEditingController();
     final TextEditingController contactController = TextEditingController();
-    final TextEditingController packsController = TextEditingController(text: '1');
+    final TextEditingController packsController = TextEditingController(); // No default value - empty field
     final TextEditingController notesController = TextEditingController();
     String status = 'Processing';
     String? paymentStatus; // Set to null initially for default prompt
@@ -489,7 +489,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
     String packType = ProductConfig.standPouch; // Default pack type
     String priceType = ProductConfig.wholesale; // Default price type
     double unitPrice = 70.0; // Default unit price
-    double totalPrice = 70.0; // Default total price (will be updated based on quantity)
+    double totalPrice = 0.0; // Set to 0 initially since default packs is 0
     
     // Get theme for consistent styling
     final theme = Theme.of(context);
@@ -608,17 +608,28 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                             labelText: 'Packs Ordered',
                             border: const OutlineInputBorder(),
                             prefixIcon: Icon(Icons.inventory, color: theme.primaryColor),
+                            hintText: 'Enter number of packs',
                           ),
+                          // Only allow numeric input
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           onChanged: (value) {
                             // Update total price when quantity changes
-                            try {
-                              int packs = int.parse(value);
-                              setState(() {
-                                totalPrice = unitPrice * packs;
-                              });
-                            } catch (e) {
-                              // Handle invalid input
-                            }
+                            setState(() {
+                              if (value.isEmpty) {
+                                // If input is empty, set total price to 0
+                                totalPrice = 0.0;
+                              } else {
+                                try {
+                                  int packs = int.parse(value);
+                                  totalPrice = unitPrice * packs;
+                                } catch (e) {
+                                  // Handle invalid input - set to 0 for non-numeric input
+                                  totalPrice = 0.0;
+                                }
+                              }
+                            });
                           },
                         ),
                         const SizedBox(height: 12),
@@ -640,11 +651,16 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                                 unitPrice = priceType == ProductConfig.wholesale ? 20.0 : 35.0;
                               }
                               // Update total price
-                              try {
-                                int packs = int.parse(packsController.text);
-                                totalPrice = unitPrice * packs;
-                              } catch (e) {
-                                totalPrice = unitPrice;
+                              if (packsController.text.isEmpty) {
+                                totalPrice = 0.0;
+                              } else {
+                                try {
+                                  int packs = int.parse(packsController.text);
+                                  totalPrice = unitPrice * packs;
+                                } catch (e) {
+                                  // If input is not a valid number, set total price to 0
+                                  totalPrice = 0.0;
+                                }
                               }
                             });
                           },
@@ -675,11 +691,16 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                                 unitPrice = priceType == ProductConfig.wholesale ? 20.0 : 35.0;
                               }
                               // Update total price
-                              try {
-                                int packs = int.parse(packsController.text);
-                                totalPrice = unitPrice * packs;
-                              } catch (e) {
-                                totalPrice = unitPrice;
+                              if (packsController.text.isEmpty) {
+                                totalPrice = 0.0;
+                              } else {
+                                try {
+                                  int packs = int.parse(packsController.text);
+                                  totalPrice = unitPrice * packs;
+                                } catch (e) {
+                                  // If input is not a valid number, set total price to 0
+                                  totalPrice = 0.0;
+                                }
                               }
                             });
                           },
@@ -692,22 +713,63 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                           }).toList(),
                         ),
                         const SizedBox(height: 12),
-                        // Price Summary (Read-only)
-                        InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Price Summary',
-                            border: const OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.monetization_on, color: theme.primaryColor),
+                        // Price Summary (Read-only active counter)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Unit Price: ₱${unitPrice.toStringAsFixed(2)}'),
-                              Text('Total Price: ₱${totalPrice.toStringAsFixed(2)}'),
+                              Row(
+                                children: [
+                                  Icon(Icons.monetization_on, 
+                                    color: theme.primaryColor, 
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Price Summary',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Unit Price:'),
+                                  Text(
+                                    '₱${unitPrice.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Total Price:'),
+                                  Text(
+                                    '₱${totalPrice.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: theme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           decoration: InputDecoration(
                             labelText: 'Status',
